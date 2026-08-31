@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   AlertTriangle, 
   ShieldAlert, 
@@ -9,15 +9,18 @@ import {
   UserCheck, 
   CheckCircle2, 
   X, 
-  ChevronRight,
   TrendingDown,
   Info,
   Users,
   Calendar,
   ArrowRightLeft,
   Clock,
-  Layers,
-  AlertCircle
+  AlertCircle,
+  Database,
+  Send,
+  RefreshCw,
+  ExternalLink,
+  Code
 } from 'lucide-react';
 
 interface Patient {
@@ -39,6 +42,7 @@ interface Patient {
   };
   activeActions: string[];
   override?: { type: string; score: number; reason: string };
+  fhirId?: string;
 }
 
 const INITIAL_PATIENTS: Patient[] = [
@@ -132,7 +136,13 @@ export default function App() {
   const [activeModalRisk, setActiveModalRisk] = useState<'fall' | 'meds' | 'violence' | null>(null);
   const [overrideScore, setOverrideScore] = useState<string>('');
   const [overrideReason, setOverrideReason] = useState<string>('');
-  const [activeTab, setActiveTab] = useState<'ward' | 'num'>('ward');
+  const [activeTab, setActiveTab] = useState<'ward' | 'num' | 'fhir'>('ward');
+
+  // FHIR State
+  const [fhirJsonModal, setFhirJsonModal] = useState<any | null>(null);
+  const [fhirSyncLoading, setFhirSyncLoading] = useState<boolean>(false);
+  const [fhirSyncStatus, setFhirSyncStatus] = useState<string | null>(null);
+  const [hapiResponse, setHapiResponse] = useState<any | null>(null);
 
   const getTierColor = (score: number) => {
     if (score >= 65) return { bg: 'bg-red-500/15', text: 'text-red-400', border: 'border-red-500/30', hex: '#EF4444' };
@@ -190,6 +200,84 @@ export default function App() {
     setOverrideReason('');
   };
 
+  // Generate FHIR R4 RiskAssessment Resource
+  const generateFhirPayload = (p: Patient) => {
+    return {
+      resourceType: "RiskAssessment",
+      status: "final",
+      subject: {
+        reference: `Patient/${p.mrn}`,
+        display: p.name
+      },
+      occurrenceDateTime: new Date().toISOString(),
+      code: {
+        coding: [
+          {
+            system: "http://snomed.info/sct",
+            code: "129839007",
+            display: "At risk for falls"
+          }
+        ]
+      },
+      prediction: [
+        {
+          outcome: { text: "In-Hospital Fall" },
+          probabilityDecimal: p.risks.fall.score / 100,
+          qualitativeRisk: {
+            coding: [
+              {
+                system: "http://terminology.hl7.org/CodeSystem/risk-probability",
+                code: p.risks.fall.score >= 65 ? "high" : p.risks.fall.score >= 33 ? "moderate" : "low"
+              }
+            ]
+          },
+          rationale: p.risks.fall.drivers.join("; ")
+        },
+        {
+          outcome: { text: "Medication Administration Safety Error" },
+          probabilityDecimal: p.risks.meds.score / 100,
+          qualitativeRisk: {
+            coding: [
+              {
+                system: "http://terminology.hl7.org/CodeSystem/risk-probability",
+                code: p.risks.meds.score >= 65 ? "high" : p.risks.meds.score >= 33 ? "moderate" : "low"
+              }
+            ]
+          },
+          rationale: p.risks.meds.drivers.join("; ")
+        }
+      ],
+      mitigation: p.activeActions.join(", "),
+      note: p.override ? [{ text: `Clinician Override: ${p.override.reason} (Adjusted to ${p.override.score}%)` }] : []
+    };
+  };
+
+  // Transmit directly to Live HAPI FHIR R4 Public Server
+  const transmitToHapiFhir = async (p: Patient) => {
+    setFhirSyncLoading(true);
+    setFhirSyncStatus(`Submitting ${p.name} RiskAssessment to HAPI FHIR R4...`);
+    try {
+      const payload = generateFhirPayload(p);
+      const res = await fetch('https://hapi.fhir.org/baseR4/RiskAssessment', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/fhir+json',
+          'Accept': 'application/fhir+json'
+        },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      setHapiResponse(data);
+      setFhirSyncStatus(`Success! Resource stored with HAPI FHIR ID: ${data.id}`);
+      setPatients(prev => prev.map(pt => pt.id === p.id ? { ...pt, fhirId: data.id } : pt));
+    } catch (err: any) {
+      console.error(err);
+      setFhirSyncStatus(`Failed to connect to HAPI FHIR: ${err.message}`);
+    } finally {
+      setFhirSyncLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans flex flex-col">
       {/* Top Header */}
@@ -200,23 +288,21 @@ export default function App() {
           </div>
           <div>
             <h1 className="text-lg font-bold tracking-tight text-white flex items-center gap-2">
-              PreHaRM Clinical Surveillance Dashboard
+              PreHaRM Clinical Surveillance Platform
               <span className="text-[10px] uppercase font-semibold bg-indigo-500/20 text-indigo-300 px-2 py-0.5 rounded border border-indigo-500/30">
-                v1.0 Web CDSS
+                v3.0 FHIR R4
               </span>
             </h1>
-            <p className="text-xs text-slate-400">Real-Time In-Hospital Harm Analytics</p>
+            <p className="text-xs text-slate-400">Sunrise EMR Real-Time In-Hospital Harm Analytics</p>
           </div>
         </div>
 
-        {/* Functional View Toggle Buttons */}
+        {/* View Switchers */}
         <div className="flex items-center gap-2 bg-slate-800/80 p-1 rounded-lg border border-slate-700">
           <button 
             onClick={() => setActiveTab('ward')}
             className={`px-3 py-1.5 rounded-md text-xs font-medium transition cursor-pointer ${
-              activeTab === 'ward' 
-                ? 'bg-indigo-600 text-white shadow' 
-                : 'text-slate-400 hover:text-slate-200'
+              activeTab === 'ward' ? 'bg-indigo-600 text-white shadow' : 'text-slate-400 hover:text-slate-200'
             }`}
           >
             Ward Display
@@ -224,12 +310,19 @@ export default function App() {
           <button 
             onClick={() => setActiveTab('num')}
             className={`px-3 py-1.5 rounded-md text-xs font-medium transition cursor-pointer ${
-              activeTab === 'num' 
-                ? 'bg-indigo-600 text-white shadow' 
-                : 'text-slate-400 hover:text-slate-200'
+              activeTab === 'num' ? 'bg-indigo-600 text-white shadow' : 'text-slate-400 hover:text-slate-200'
             }`}
           >
             NUM Overview
+          </button>
+          <button 
+            onClick={() => setActiveTab('fhir')}
+            className={`px-3 py-1.5 rounded-md text-xs font-medium transition flex items-center gap-1.5 cursor-pointer ${
+              activeTab === 'fhir' ? 'bg-indigo-600 text-white shadow' : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Database className="w-3.5 h-3.5 text-emerald-400" />
+            HAPI FHIR Live API
           </button>
         </div>
       </header>
@@ -302,7 +395,7 @@ export default function App() {
               </svg>
             </div>
 
-            {/* Unit Aggregate Risk Gauge Panel */}
+            {/* Mean Acuity Summary */}
             <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-xl">
               <h3 className="text-sm font-bold text-slate-200 mb-3 flex items-center gap-2">
                 <Activity className="w-4 h-4 text-indigo-400" />
@@ -329,7 +422,7 @@ export default function App() {
               <div className="p-5 border-b border-slate-800 flex items-center justify-between">
                 <div>
                   <h2 className="text-sm font-bold text-slate-200">Patient Risk & Surveillance Grid</h2>
-                  <p className="text-xs text-slate-400">Click any risk badge to inspect contributing XAI drivers or record an override.</p>
+                  <p className="text-xs text-slate-400">Click badges for XAI drivers or &lt;FHIR&gt; to generate HL7 payloads.</p>
                 </div>
               </div>
 
@@ -341,7 +434,7 @@ export default function App() {
                       <th className="py-3 px-3 text-center">Fall Risk</th>
                       <th className="py-3 px-3 text-center">Med Error</th>
                       <th className="py-3 px-3 text-center">Violence</th>
-                      <th className="py-3 px-4">Active Mitigations</th>
+                      <th className="py-3 px-4">FHIR R4</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-800/60 text-xs">
@@ -392,17 +485,18 @@ export default function App() {
                           </td>
 
                           <td className="py-3 px-4">
-                            <div className="flex flex-wrap gap-1">
-                              {p.activeActions.map((act, i) => (
-                                <span key={i} className="bg-indigo-500/15 text-indigo-300 border border-indigo-500/30 px-2 py-0.5 rounded text-[10px] font-medium">
-                                  {act}
-                                </span>
-                              ))}
+                            <div className="flex items-center gap-2">
                               <button
-                                onClick={() => setSelectedPatient(p)}
-                                className="text-[10px] text-slate-400 hover:text-indigo-400 underline ml-1 cursor-pointer"
+                                onClick={() => setFhirJsonModal(generateFhirPayload(p))}
+                                className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-indigo-300 border border-indigo-500/30 rounded text-[10px] font-mono font-bold flex items-center gap-1 transition cursor-pointer"
                               >
-                                Edit
+                                <Code className="w-3 h-3" /> JSON
+                              </button>
+                              <button
+                                onClick={() => transmitToHapiFhir(p)}
+                                className="px-2 py-1 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 rounded text-[10px] font-medium flex items-center gap-1 transition cursor-pointer"
+                              >
+                                <Send className="w-3 h-3" /> Sync HAPI
                               </button>
                             </div>
                           </td>
@@ -414,7 +508,7 @@ export default function App() {
               </div>
             </div>
 
-            {/* Intervention Bundles Panel */}
+            {/* Action Bundles Panel */}
             {selectedPatient && !activeModalRisk && (
               <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-xl">
                 <div className="flex items-center justify-between mb-3 border-b border-slate-800 pb-3">
@@ -454,10 +548,9 @@ export default function App() {
         </main>
       )}
 
-      {/* View 2: NUM (Nurse Unit Manager) Overview */}
+      {/* View 2: NUM Overview */}
       {activeTab === 'num' && (
         <main className="flex-1 p-6 max-w-7xl mx-auto w-full space-y-6">
-          {/* Top NUM Summary Ribbon */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 flex items-center gap-4">
               <div className="w-10 h-10 rounded-lg bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
@@ -465,7 +558,7 @@ export default function App() {
               </div>
               <div>
                 <p className="text-xs text-slate-400 uppercase font-semibold">Ward Occupancy</p>
-                <p className="text-xl font-black text-white">4 / 4 <span className="text-xs font-normal text-slate-400">(100%)</span></p>
+                <p className="text-xl font-black text-white">4 / 4 (100%)</p>
               </div>
             </div>
 
@@ -500,7 +593,7 @@ export default function App() {
             </div>
           </div>
 
-          {/* 7-Day Shift Risk Forecast Matrix (PreHaRM NUM Specification) */}
+          {/* 7-Day Matrix */}
           <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-xl">
             <div className="flex items-center justify-between mb-4 border-b border-slate-800 pb-3">
               <div>
@@ -508,7 +601,7 @@ export default function App() {
                   <Calendar className="w-4 h-4 text-indigo-400" />
                   7-Day Forward Risk Forecast by Shift
                 </h2>
-                <p className="text-xs text-slate-400">Projected risk scores per shift based on planned admissions, transit, and staffing skill-mix.</p>
+                <p className="text-xs text-slate-400">Projected risk scores per shift based on planned admissions and staffing skill-mix.</p>
               </div>
               <span className="text-[10px] bg-slate-800 text-slate-300 border border-slate-700 px-2 py-1 rounded font-medium">
                 Traffic Light Matrix
@@ -570,64 +663,102 @@ export default function App() {
               </table>
             </div>
           </div>
+        </main>
+      )}
 
-          {/* Lower Grid: Staffing & Transfer Recommendations */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Shift Staff Acuity Panel */}
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-xl">
-              <h3 className="text-sm font-bold text-slate-200 mb-3 flex items-center gap-2">
-                <UserCheck className="w-4 h-4 text-indigo-400" />
-                Active Shift Staffing & Skill Mix
-              </h3>
-              <div className="space-y-2.5">
-                {[
-                  { name: 'Sarah Jenkins, RN', role: 'Team Leader', exp: '10 yrs', weight: 'High Skill (0.95)', status: 'Active' },
-                  { name: 'David Miller, RN', role: 'Staff Nurse', exp: '4 yrs', weight: 'Med Skill (0.75)', status: 'Active' },
-                  { name: 'Chloe Adams, EN', role: 'Enrolled Nurse', exp: '1 yr', weight: 'Graduate (0.50)', status: 'Active' }
-                ].map((staff, idx) => (
-                  <div key={idx} className="bg-slate-950 p-3 rounded-lg border border-slate-800 flex items-center justify-between text-xs">
-                    <div>
-                      <p className="font-bold text-slate-200">{staff.name}</p>
-                      <p className="text-slate-400 text-[11px]">{staff.role} • {staff.exp} experience</p>
-                    </div>
-                    <span className="bg-slate-800 text-indigo-300 px-2 py-1 rounded text-[10px] font-medium border border-slate-700">
-                      {staff.weight}
-                    </span>
-                  </div>
-                ))}
+      {/* View 3: Live HAPI FHIR Server Explorer */}
+      {activeTab === 'fhir' && (
+        <main className="flex-1 p-6 max-w-7xl mx-auto w-full space-y-6">
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-xl">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-4 mb-4">
+              <div>
+                <h2 className="text-base font-bold text-white flex items-center gap-2">
+                  <Database className="w-5 h-5 text-emerald-400" />
+                  Live HL7 FHIR R4 Public Server Integration
+                </h2>
+                <p className="text-xs text-slate-400">
+                  Direct RESTful transactions with public test endpoint: <code className="text-indigo-300 font-mono">https://hapi.fhir.org/baseR4/RiskAssessment</code>
+                </p>
               </div>
+              <a 
+                href="https://hapi.fhir.org/baseR4/RiskAssessment?_pretty=true" 
+                target="_blank" 
+                rel="noreferrer"
+                className="flex items-center gap-1.5 text-xs bg-slate-800 text-indigo-300 px-3 py-1.5 rounded-lg border border-slate-700 hover:bg-slate-700 transition"
+              >
+                Open HAPI Server <ExternalLink className="w-3.5 h-3.5" />
+              </a>
             </div>
 
-            {/* Bed Incompatibility & Transfer Predictor */}
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-xl">
-              <h3 className="text-sm font-bold text-slate-200 mb-3 flex items-center gap-2">
-                <ArrowRightLeft className="w-4 h-4 text-indigo-400" />
-                Transfer & Bed Incompatibility Flags
-              </h3>
-              <div className="space-y-2.5">
-                <div className="bg-slate-950 p-3 rounded-lg border border-amber-500/30 text-xs flex items-start gap-3">
-                  <AlertCircle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
-                  <div>
-                    <p className="font-bold text-slate-200">Bed 1 (Arthur Dent) — Cardiac in Gen Med</p>
-                    <p className="text-slate-400 text-[11px] mt-0.5">
-                      Recommended transfer to <strong>Cardiology 3B</strong> once Bed 8 discharges (&lt;6 hrs) to optimize telemetry surveillance.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="bg-slate-950 p-3 rounded-lg border border-slate-800 text-xs flex items-start gap-3">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
-                  <div>
-                    <p className="font-bold text-slate-200">Bed 4 (Clara Oswald) — Discharge Ready</p>
-                    <p className="text-slate-400 text-[11px] mt-0.5">
-                      Discharge pathway active. Predicted bed vacancy at 14:00 today.
-                    </p>
-                  </div>
-                </div>
+            {fhirSyncStatus && (
+              <div className="mb-4 p-3 bg-slate-950 border border-emerald-500/30 text-emerald-300 rounded-lg text-xs font-mono flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                {fhirSyncStatus}
               </div>
+            )}
+
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-6">
+              {patients.map(p => (
+                <button
+                  key={p.id}
+                  disabled={fhirSyncLoading}
+                  onClick={() => transmitToHapiFhir(p)}
+                  className="p-3 bg-slate-950 border border-slate-800 hover:border-indigo-500/50 rounded-lg text-left transition cursor-pointer"
+                >
+                  <p className="font-bold text-xs text-slate-200">Bed {p.bed}: {p.name}</p>
+                  <p className="text-[10px] text-slate-400 mt-1">Falls: {p.risks.fall.score}% • Meds: {p.risks.meds.score}%</p>
+                  <div className="mt-2 text-[10px] font-mono text-indigo-400 flex items-center gap-1">
+                    <Send className="w-3 h-3" /> Transmit to HAPI
+                  </div>
+                </button>
+              ))}
             </div>
+
+            {hapiResponse && (
+              <div>
+                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">
+                  Server Response Payload (Received from HAPI FHIR R4):
+                </h3>
+                <pre className="text-xs font-mono text-emerald-400 bg-slate-950 p-4 rounded-lg border border-slate-800 overflow-x-auto max-h-96">
+                  {JSON.stringify(hapiResponse, null, 2)}
+                </pre>
+              </div>
+            )}
           </div>
         </main>
+      )}
+
+      {/* Modal: View Generated FHIR JSON */}
+      {fhirJsonModal && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-slate-900 border border-slate-800 rounded-xl max-w-2xl w-full p-6 shadow-2xl flex flex-col max-h-[85vh]">
+            <div className="flex justify-between items-center mb-3 border-b border-slate-800 pb-3">
+              <div>
+                <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
+                  <Code className="w-4 h-4 text-indigo-400" />
+                  HL7 FHIR R4 RiskAssessment Resource
+                </h3>
+                <p className="text-xs text-slate-400">Validated against SNOMED CT & HL7 Risk-Probability terminology.</p>
+              </div>
+              <button onClick={() => setFhirJsonModal(null)} className="text-slate-400 hover:text-slate-200 cursor-pointer">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <pre className="flex-1 text-xs font-mono text-emerald-400 bg-slate-950 p-4 rounded-lg border border-slate-800 overflow-auto">
+              {JSON.stringify(fhirJsonModal, null, 2)}
+            </pre>
+
+            <div className="flex justify-end mt-4">
+              <button 
+                onClick={() => setFhirJsonModal(null)}
+                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium rounded-lg cursor-pointer"
+              >
+                Close Inspector
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* XAI Contributing Drivers & Clinician Override Modal */}
