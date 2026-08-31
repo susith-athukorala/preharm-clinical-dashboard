@@ -284,16 +284,16 @@ export default function App() {
       <header className="border-b border-slate-800 bg-slate-900/80 backdrop-blur px-6 py-4 flex items-center justify-between sticky top-0 z-30">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-lg bg-indigo-600 flex items-center justify-center font-black text-white shadow-lg shadow-indigo-600/30">
-            PH
+            PCSD
           </div>
           <div>
             <h1 className="text-lg font-bold tracking-tight text-white flex items-center gap-2">
-              PreHaRM Clinical Surveillance Platform
+              PreHaRM Clinical Surveillance Dashboard
               <span className="text-[10px] uppercase font-semibold bg-indigo-500/20 text-indigo-300 px-2 py-0.5 rounded border border-indigo-500/30">
-                v3.0 FHIR R4
+                v0.1 FHIR R4
               </span>
             </h1>
-            <p className="text-xs text-slate-400">Sunrise EMR Real-Time In-Hospital Harm Analytics</p>
+            <p className="text-xs text-slate-400">Real-Time In-Hospital Harm Analytics</p>
           </div>
         </div>
 
