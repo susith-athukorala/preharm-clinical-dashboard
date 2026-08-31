@@ -11,7 +11,13 @@ import {
   X, 
   ChevronRight,
   TrendingDown,
-  Info
+  Info,
+  Users,
+  Calendar,
+  ArrowRightLeft,
+  Clock,
+  Layers,
+  AlertCircle
 } from 'lucide-react';
 
 interface Patient {
@@ -142,7 +148,6 @@ export default function App() {
         ? p.activeActions.filter(a => a !== actionName)
         : [...p.activeActions, actionName];
       
-      // Dynamic closed-loop risk impact
       let fallDelta = 0;
       if (actionName === 'Bed Guards' || actionName === 'Low Bed Mode') fallDelta = exists ? 12 : -12;
       if (actionName === 'Assist Toilet') fallDelta = exists ? 8 : -8;
@@ -204,239 +209,426 @@ export default function App() {
           </div>
         </div>
 
+        {/* Functional View Toggle Buttons */}
         <div className="flex items-center gap-2 bg-slate-800/80 p-1 rounded-lg border border-slate-700">
           <button 
             onClick={() => setActiveTab('ward')}
-            className={`px-3 py-1.5 rounded-md text-xs font-medium transition ${activeTab === 'ward' ? 'bg-indigo-600 text-white shadow' : 'text-slate-400 hover:text-slate-200'}`}
+            className={`px-3 py-1.5 rounded-md text-xs font-medium transition cursor-pointer ${
+              activeTab === 'ward' 
+                ? 'bg-indigo-600 text-white shadow' 
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
           >
             Ward Display
           </button>
           <button 
             onClick={() => setActiveTab('num')}
-            className={`px-3 py-1.5 rounded-md text-xs font-medium transition ${activeTab === 'num' ? 'bg-indigo-600 text-white shadow' : 'text-slate-400 hover:text-slate-200'}`}
+            className={`px-3 py-1.5 rounded-md text-xs font-medium transition cursor-pointer ${
+              activeTab === 'num' 
+                ? 'bg-indigo-600 text-white shadow' 
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
           >
             NUM Overview
           </button>
         </div>
       </header>
 
-      {/* Main Grid Workspace */}
-      <main className="flex-1 p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 max-w-7xl mx-auto w-full">
-        {/* Spatial Floorplan Map */}
-        <div className="lg:col-span-5 flex flex-col gap-6">
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-xl">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-sm font-bold text-slate-200 flex items-center gap-2">
-                <Navigation className="w-4 h-4 text-indigo-400" />
-                Ward 4G — Spatial Bed & Transit Map
-              </h2>
-              <span className="text-[11px] text-slate-500">Live Spatial Status</span>
+      {/* View 1: Ward Display */}
+      {activeTab === 'ward' && (
+        <main className="flex-1 p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 max-w-7xl mx-auto w-full">
+          {/* Spatial Floorplan Map */}
+          <div className="lg:col-span-5 flex flex-col gap-6">
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-xl">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-sm font-bold text-slate-200 flex items-center gap-2">
+                  <Navigation className="w-4 h-4 text-indigo-400" />
+                  Ward 4G — Spatial Bed & Transit Map
+                </h2>
+                <span className="text-[11px] text-slate-500">Live Spatial Status</span>
+              </div>
+
+              <svg viewBox="0 0 400 280" className="w-full h-auto bg-slate-950 rounded-lg p-2 border border-slate-800/80">
+                <rect x="20" y="120" width="360" height="40" fill="#1e293b" rx="4" />
+                <text x="200" y="145" textAnchor="middle" fill="#64748b" fontSize="10" fontWeight="bold" letterSpacing="1">
+                  CENTRAL NURSING CORRIDOR
+                </text>
+
+                {[
+                  { bed: 1, x: 30, y: 20 },
+                  { bed: 2, x: 230, y: 20 },
+                  { bed: 3, x: 30, y: 180 },
+                  { bed: 4, x: 230, y: 180 }
+                ].map(coord => {
+                  const p = patients.find(pt => pt.bed === coord.bed);
+                  const colors = p ? getTierColor(p.risks.fall.score) : { hex: '#334155' };
+                  return (
+                    <g 
+                      key={coord.bed} 
+                      onClick={() => p && setSelectedPatient(p)}
+                      className="cursor-pointer transition hover:opacity-90"
+                    >
+                      <rect 
+                        x={coord.x} 
+                        y={coord.y} 
+                        width="140" 
+                        height="80" 
+                        fill="#0f172a" 
+                        stroke={colors.hex} 
+                        strokeWidth="2" 
+                        rx="6"
+                      />
+                      <text x={coord.x + 10} y={coord.y + 20} fill="#94a3b8" fontSize="11" fontWeight="bold">
+                        Bed {coord.bed}
+                      </text>
+                      {p ? (
+                        <>
+                          <text x={coord.x + 10} y={coord.y + 38} fill="#f8fafc" fontSize="11" fontWeight="600">
+                            {p.name}
+                          </text>
+                          <text x={coord.x + 10} y={coord.y + 54} fill={p.status === 'In Transit' ? '#38bdf8' : '#64748b'} fontSize="9">
+                            {p.status === 'In Transit' ? `Transit: ${p.transitDestination}` : 'Status: In Bed'}
+                          </text>
+                          <circle cx={coord.x + 120} cy={coord.y + 68} r="5" fill={getTierColor(p.risks.fall.score).hex} />
+                          <circle cx={coord.x + 106} cy={coord.y + 68} r="5" fill={getTierColor(p.risks.meds.score).hex} />
+                          <circle cx={coord.x + 92} cy={coord.y + 68} r="5" fill={getTierColor(p.risks.violence.score).hex} />
+                        </>
+                      ) : (
+                        <text x={coord.x + 70} y={coord.y + 45} textAnchor="middle" fill="#475569" fontSize="10">Vacant</text>
+                      )}
+                    </g>
+                  );
+                })}
+              </svg>
             </div>
 
-            <svg viewBox="0 0 400 280" className="w-full h-auto bg-slate-950 rounded-lg p-2 border border-slate-800/80">
-              <rect x="20" y="120" width="360" height="40" fill="#1e293b" rx="4" />
-              <text x="200" y="145" textAnchor="middle" fill="#64748b" fontSize="10" fontWeight="bold" letterSpacing="1">
-                CENTRAL NURSING CORRIDOR
-              </text>
-
-              {[
-                { bed: 1, x: 30, y: 20 },
-                { bed: 2, x: 230, y: 20 },
-                { bed: 3, x: 30, y: 180 },
-                { bed: 4, x: 230, y: 180 }
-              ].map(coord => {
-                const p = patients.find(pt => pt.bed === coord.bed);
-                const colors = p ? getTierColor(p.risks.fall.score) : { hex: '#334155' };
-                return (
-                  <g 
-                    key={coord.bed} 
-                    onClick={() => p && setSelectedPatient(p)}
-                    className="cursor-pointer transition hover:opacity-90"
-                  >
-                    <rect 
-                      x={coord.x} 
-                      y={coord.y} 
-                      width="140" 
-                      height="80" 
-                      fill="#0f172a" 
-                      stroke={colors.hex} 
-                      strokeWidth="2" 
-                      rx="6"
-                    />
-                    <text x={coord.x + 10} y={coord.y + 20} fill="#94a3b8" fontSize="11" fontWeight="bold">
-                      Bed {coord.bed}
-                    </text>
-                    {p ? (
-                      <>
-                        <text x={coord.x + 10} y={coord.y + 38} fill="#f8fafc" fontSize="11" fontWeight="600">
-                          {p.name}
-                        </text>
-                        <text x={coord.x + 10} y={coord.y + 54} fill={p.status === 'In Transit' ? '#38bdf8' : '#64748b'} fontSize="9">
-                          {p.status === 'In Transit' ? `Transit: ${p.transitDestination}` : 'Status: In Bed'}
-                        </text>
-                        <circle cx={coord.x + 120} cy={coord.y + 68} r="5" fill={getTierColor(p.risks.fall.score).hex} />
-                        <circle cx={coord.x + 106} cy={coord.y + 68} r="5" fill={getTierColor(p.risks.meds.score).hex} />
-                        <circle cx={coord.x + 92} cy={coord.y + 68} r="5" fill={getTierColor(p.risks.violence.score).hex} />
-                      </>
-                    ) : (
-                      <text x={coord.x + 70} y={coord.y + 45} textAnchor="middle" fill="#475569" fontSize="10">Vacant</text>
-                    )}
-                  </g>
-                );
-              })}
-            </svg>
+            {/* Unit Aggregate Risk Gauge Panel */}
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-xl">
+              <h3 className="text-sm font-bold text-slate-200 mb-3 flex items-center gap-2">
+                <Activity className="w-4 h-4 text-indigo-400" />
+                Ward Mean Acuity Summary
+              </h3>
+              <div className="grid grid-cols-3 gap-3">
+                {[
+                  { label: 'Falls Avg', val: Math.round(patients.reduce((a, b) => a + b.risks.fall.score, 0) / patients.length), color: 'text-amber-400' },
+                  { label: 'Meds Avg', val: Math.round(patients.reduce((a, b) => a + b.risks.meds.score, 0) / patients.length), color: 'text-emerald-400' },
+                  { label: 'Violence Avg', val: Math.round(patients.reduce((a, b) => a + b.risks.violence.score, 0) / patients.length), color: 'text-red-400' }
+                ].map((metric, i) => (
+                  <div key={i} className="bg-slate-950 p-3 rounded-lg border border-slate-800/80 text-center">
+                    <div className="text-[11px] text-slate-400 uppercase font-semibold">{metric.label}</div>
+                    <div className={`text-xl font-black mt-1 ${metric.color}`}>{metric.val}%</div>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
 
-          {/* Unit Aggregate Risk Gauge Panel */}
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-xl">
-            <h3 className="text-sm font-bold text-slate-200 mb-3 flex items-center gap-2">
-              <Activity className="w-4 h-4 text-indigo-400" />
-              Ward Mean Acuity Summary
-            </h3>
-            <div className="grid grid-cols-3 gap-3">
-              {[
-                { label: 'Falls Avg', val: Math.round(patients.reduce((a, b) => a + b.risks.fall.score, 0) / patients.length), color: 'text-amber-400' },
-                { label: 'Meds Avg', val: Math.round(patients.reduce((a, b) => a + b.risks.meds.score, 0) / patients.length), color: 'text-emerald-400' },
-                { label: 'Violence Avg', val: Math.round(patients.reduce((a, b) => a + b.risks.violence.score, 0) / patients.length), color: 'text-red-400' }
-              ].map((metric, i) => (
-                <div key={i} className="bg-slate-950 p-3 rounded-lg border border-slate-800/80 text-center">
-                  <div className="text-[11px] text-slate-400 uppercase font-semibold">{metric.label}</div>
-                  <div className={`text-xl font-black mt-1 ${metric.color}`}>{metric.val}%</div>
+          {/* Patient Interactive Grid */}
+          <div className="lg:col-span-7 flex flex-col gap-6">
+            <div className="bg-slate-900 border border-slate-800 rounded-xl shadow-xl overflow-hidden">
+              <div className="p-5 border-b border-slate-800 flex items-center justify-between">
+                <div>
+                  <h2 className="text-sm font-bold text-slate-200">Patient Risk & Surveillance Grid</h2>
+                  <p className="text-xs text-slate-400">Click any risk badge to inspect contributing XAI drivers or record an override.</p>
                 </div>
-              ))}
-            </div>
-          </div>
-        </div>
+              </div>
 
-        {/* Patient Interactive Grid */}
-        <div className="lg:col-span-7 flex flex-col gap-6">
-          <div className="bg-slate-900 border border-slate-800 rounded-xl shadow-xl overflow-hidden">
-            <div className="p-5 border-b border-slate-800 flex items-center justify-between">
-              <div>
-                <h2 className="text-sm font-bold text-slate-200">Patient Risk & Surveillance Grid</h2>
-                <p className="text-xs text-slate-400">Click any risk badge to inspect contributing XAI drivers or record an override.</p>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="bg-slate-950/60 text-[11px] font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-800">
+                      <th className="py-3 px-4">Bed & Patient</th>
+                      <th className="py-3 px-3 text-center">Fall Risk</th>
+                      <th className="py-3 px-3 text-center">Med Error</th>
+                      <th className="py-3 px-3 text-center">Violence</th>
+                      <th className="py-3 px-4">Active Mitigations</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800/60 text-xs">
+                    {patients.map(p => {
+                      const fallColor = getTierColor(p.risks.fall.score);
+                      const medsColor = getTierColor(p.risks.meds.score);
+                      const violColor = getTierColor(p.risks.violence.score);
+
+                      return (
+                        <tr key={p.id} className="hover:bg-slate-800/40 transition">
+                          <td className="py-3 px-4">
+                            <div className="font-bold text-slate-200 flex items-center gap-1.5">
+                              <span className="w-5 h-5 rounded bg-slate-800 flex items-center justify-center text-[10px] text-indigo-300 font-bold border border-slate-700">
+                                {p.bed}
+                              </span>
+                              {p.name}
+                            </div>
+                            <div className="text-[11px] text-slate-400 mt-0.5">
+                              {p.age}y {p.gender} • {p.diagnosis}
+                            </div>
+                          </td>
+
+                          <td className="py-3 px-3 text-center">
+                            <button
+                              onClick={() => { setSelectedPatient(p); setActiveModalRisk('fall'); }}
+                              className={`px-2.5 py-1 rounded font-bold border cursor-pointer ${fallColor.bg} ${fallColor.text} ${fallColor.border} transition hover:scale-105`}
+                            >
+                              {p.risks.fall.score}%
+                            </button>
+                          </td>
+
+                          <td className="py-3 px-3 text-center">
+                            <button
+                              onClick={() => { setSelectedPatient(p); setActiveModalRisk('meds'); }}
+                              className={`px-2.5 py-1 rounded font-bold border cursor-pointer ${medsColor.bg} ${medsColor.text} ${medsColor.border} transition hover:scale-105`}
+                            >
+                              {p.risks.meds.score}%
+                            </button>
+                          </td>
+
+                          <td className="py-3 px-3 text-center">
+                            <button
+                              onClick={() => { setSelectedPatient(p); setActiveModalRisk('violence'); }}
+                              className={`px-2.5 py-1 rounded font-bold border cursor-pointer ${violColor.bg} ${violColor.text} ${violColor.border} transition hover:scale-105`}
+                            >
+                              {p.risks.violence.score}%
+                            </button>
+                          </td>
+
+                          <td className="py-3 px-4">
+                            <div className="flex flex-wrap gap-1">
+                              {p.activeActions.map((act, i) => (
+                                <span key={i} className="bg-indigo-500/15 text-indigo-300 border border-indigo-500/30 px-2 py-0.5 rounded text-[10px] font-medium">
+                                  {act}
+                                </span>
+                              ))}
+                              <button
+                                onClick={() => setSelectedPatient(p)}
+                                className="text-[10px] text-slate-400 hover:text-indigo-400 underline ml-1 cursor-pointer"
+                              >
+                                Edit
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
             </div>
 
+            {/* Intervention Bundles Panel */}
+            {selectedPatient && !activeModalRisk && (
+              <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-xl">
+                <div className="flex items-center justify-between mb-3 border-b border-slate-800 pb-3">
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-200">
+                      Clinical Action Bundles for Bed {selectedPatient.bed} ({selectedPatient.name})
+                    </h3>
+                    <p className="text-xs text-slate-400">Selecting mitigations dynamically recalculates in-hospital risk scores.</p>
+                  </div>
+                  <button onClick={() => setSelectedPatient(null)} className="text-slate-400 hover:text-slate-200 cursor-pointer">
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                  {AVAILABLE_ACTIONS.map(action => {
+                    const isActive = selectedPatient.activeActions.includes(action);
+                    return (
+                      <button
+                        key={action}
+                        onClick={() => toggleAction(selectedPatient.id, action)}
+                        className={`p-2.5 rounded-lg border text-left text-xs font-medium flex items-center justify-between transition cursor-pointer ${
+                          isActive 
+                            ? 'bg-indigo-600/20 border-indigo-500 text-indigo-200 shadow' 
+                            : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700'
+                        }`}
+                      >
+                        <span>{action}</span>
+                        {isActive && <CheckCircle2 className="w-3.5 h-3.5 text-indigo-400" />}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+        </main>
+      )}
+
+      {/* View 2: NUM (Nurse Unit Manager) Overview */}
+      {activeTab === 'num' && (
+        <main className="flex-1 p-6 max-w-7xl mx-auto w-full space-y-6">
+          {/* Top NUM Summary Ribbon */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 flex items-center gap-4">
+              <div className="w-10 h-10 rounded-lg bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
+                <Bed className="w-5 h-5" />
+              </div>
+              <div>
+                <p className="text-xs text-slate-400 uppercase font-semibold">Ward Occupancy</p>
+                <p className="text-xl font-black text-white">4 / 4 <span className="text-xs font-normal text-slate-400">(100%)</span></p>
+              </div>
+            </div>
+
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 flex items-center gap-4">
+              <div className="w-10 h-10 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
+                <Users className="w-5 h-5" />
+              </div>
+              <div>
+                <p className="text-xs text-slate-400 uppercase font-semibold">Roster Ratio</p>
+                <p className="text-xl font-black text-white">1:2 <span className="text-xs font-normal text-emerald-400">Optimal</span></p>
+              </div>
+            </div>
+
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 flex items-center gap-4">
+              <div className="w-10 h-10 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
+                <Clock className="w-5 h-5" />
+              </div>
+              <div>
+                <p className="text-xs text-slate-400 uppercase font-semibold">Est. Discharges &lt;24h</p>
+                <p className="text-xl font-black text-white">2 Patients</p>
+              </div>
+            </div>
+
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 flex items-center gap-4">
+              <div className="w-10 h-10 rounded-lg bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-400">
+                <ShieldAlert className="w-5 h-5" />
+              </div>
+              <div>
+                <p className="text-xs text-slate-400 uppercase font-semibold">High Acuity Beds</p>
+                <p className="text-xl font-black text-red-400">3 Beds</p>
+              </div>
+            </div>
+          </div>
+
+          {/* 7-Day Shift Risk Forecast Matrix (PreHaRM NUM Specification) */}
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-xl">
+            <div className="flex items-center justify-between mb-4 border-b border-slate-800 pb-3">
+              <div>
+                <h2 className="text-sm font-bold text-slate-200 flex items-center gap-2">
+                  <Calendar className="w-4 h-4 text-indigo-400" />
+                  7-Day Forward Risk Forecast by Shift
+                </h2>
+                <p className="text-xs text-slate-400">Projected risk scores per shift based on planned admissions, transit, and staffing skill-mix.</p>
+              </div>
+              <span className="text-[10px] bg-slate-800 text-slate-300 border border-slate-700 px-2 py-1 rounded font-medium">
+                Traffic Light Matrix
+              </span>
+            </div>
+
             <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
+              <table className="w-full text-center border-collapse">
                 <thead>
                   <tr className="bg-slate-950/60 text-[11px] font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-800">
-                    <th className="py-3 px-4">Bed & Patient</th>
-                    <th className="py-3 px-3 text-center">Fall Risk</th>
-                    <th className="py-3 px-3 text-center">Med Error</th>
-                    <th className="py-3 px-3 text-center">Violence</th>
-                    <th className="py-3 px-4">Active Mitigations</th>
+                    <th className="py-2.5 px-3 text-left">Risk Domain</th>
+                    <th className="py-2.5 px-2">Mon (AM)</th>
+                    <th className="py-2.5 px-2">Mon (PM)</th>
+                    <th className="py-2.5 px-2">Mon (Night)</th>
+                    <th className="py-2.5 px-2">Tue (AM)</th>
+                    <th className="py-2.5 px-2">Tue (PM)</th>
+                    <th className="py-2.5 px-2">Tue (Night)</th>
+                    <th className="py-2.5 px-2">Wed (AM)</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/60 text-xs">
-                  {patients.map(p => {
-                    const fallColor = getTierColor(p.risks.fall.score);
-                    const medsColor = getTierColor(p.risks.meds.score);
-                    const violColor = getTierColor(p.risks.violence.score);
-
-                    return (
-                      <tr key={p.id} className="hover:bg-slate-800/40 transition">
-                        <td className="py-3 px-4">
-                          <div className="font-bold text-slate-200 flex items-center gap-1.5">
-                            <span className="w-5 h-5 rounded bg-slate-800 flex items-center justify-center text-[10px] text-indigo-300 font-bold border border-slate-700">
-                              {p.bed}
-                            </span>
-                            {p.name}
-                          </div>
-                          <div className="text-[11px] text-slate-400 mt-0.5">
-                            {p.age}y {p.gender} • {p.diagnosis}
-                          </div>
-                        </td>
-
-                        <td className="py-3 px-3 text-center">
-                          <button
-                            onClick={() => { setSelectedPatient(p); setActiveModalRisk('fall'); }}
-                            className={`px-2.5 py-1 rounded font-bold border ${fallColor.bg} ${fallColor.text} ${fallColor.border} transition hover:scale-105`}
-                          >
-                            {p.risks.fall.score}%
-                          </button>
-                        </td>
-
-                        <td className="py-3 px-3 text-center">
-                          <button
-                            onClick={() => { setSelectedPatient(p); setActiveModalRisk('meds'); }}
-                            className={`px-2.5 py-1 rounded font-bold border ${medsColor.bg} ${medsColor.text} ${medsColor.border} transition hover:scale-105`}
-                          >
-                            {p.risks.meds.score}%
-                          </button>
-                        </td>
-
-                        <td className="py-3 px-3 text-center">
-                          <button
-                            onClick={() => { setSelectedPatient(p); setActiveModalRisk('violence'); }}
-                            className={`px-2.5 py-1 rounded font-bold border ${violColor.bg} ${violColor.text} ${violColor.border} transition hover:scale-105`}
-                          >
-                            {p.risks.violence.score}%
-                          </button>
-                        </td>
-
-                        <td className="py-3 px-4">
-                          <div className="flex flex-wrap gap-1">
-                            {p.activeActions.map((act, i) => (
-                              <span key={i} className="bg-indigo-500/15 text-indigo-300 border border-indigo-500/30 px-2 py-0.5 rounded text-[10px] font-medium">
-                                {act}
-                              </span>
-                            ))}
-                            <button
-                              onClick={() => setSelectedPatient(p)}
-                              className="text-[10px] text-slate-400 hover:text-indigo-400 underline ml-1"
-                            >
-                              Edit
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
+                  <tr>
+                    <td className="py-3 px-3 text-left font-bold text-slate-300 flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-amber-400" /> Falls
+                    </td>
+                    <td className="py-2 px-2"><span className="px-2 py-1 rounded font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30">55%</span></td>
+                    <td className="py-2 px-2"><span className="px-2 py-1 rounded font-bold bg-red-500/20 text-red-400 border border-red-500/30">72%</span></td>
+                    <td className="py-2 px-2"><span className="px-2 py-1 rounded font-bold bg-red-500/20 text-red-400 border border-red-500/30">80%</span></td>
+                    <td className="py-2 px-2"><span className="px-2 py-1 rounded font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30">48%</span></td>
+                    <td className="py-2 px-2"><span className="px-2 py-1 rounded font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30">52%</span></td>
+                    <td className="py-2 px-2"><span className="px-2 py-1 rounded font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">30%</span></td>
+                    <td className="py-2 px-2"><span className="px-2 py-1 rounded font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">25%</span></td>
+                  </tr>
+                  <tr>
+                    <td className="py-3 px-3 text-left font-bold text-slate-300 flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-emerald-400" /> Medication Safety
+                    </td>
+                    <td className="py-2 px-2"><span className="px-2 py-1 rounded font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">28%</span></td>
+                    <td className="py-2 px-2"><span className="px-2 py-1 rounded font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30">42%</span></td>
+                    <td className="py-2 px-2"><span className="px-2 py-1 rounded font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30">45%</span></td>
+                    <td className="py-2 px-2"><span className="px-2 py-1 rounded font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">20%</span></td>
+                    <td className="py-2 px-2"><span className="px-2 py-1 rounded font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">24%</span></td>
+                    <td className="py-2 px-2"><span className="px-2 py-1 rounded font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">18%</span></td>
+                    <td className="py-2 px-2"><span className="px-2 py-1 rounded font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">15%</span></td>
+                  </tr>
+                  <tr>
+                    <td className="py-3 px-3 text-left font-bold text-slate-300 flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-red-400" /> Violence / Code Black
+                    </td>
+                    <td className="py-2 px-2"><span className="px-2 py-1 rounded font-bold bg-red-500/20 text-red-400 border border-red-500/30">65%</span></td>
+                    <td className="py-2 px-2"><span className="px-2 py-1 rounded font-bold bg-red-500/20 text-red-400 border border-red-500/30">78%</span></td>
+                    <td className="py-2 px-2"><span className="px-2 py-1 rounded font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30">50%</span></td>
+                    <td className="py-2 px-2"><span className="px-2 py-1 rounded font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30">35%</span></td>
+                    <td className="py-2 px-2"><span className="px-2 py-1 rounded font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">20%</span></td>
+                    <td className="py-2 px-2"><span className="px-2 py-1 rounded font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">15%</span></td>
+                    <td className="py-2 px-2"><span className="px-2 py-1 rounded font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">10%</span></td>
+                  </tr>
                 </tbody>
               </table>
             </div>
           </div>
 
-          {/* Intervention Bundles Panel */}
-          {selectedPatient && !activeModalRisk && (
+          {/* Lower Grid: Staffing & Transfer Recommendations */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Shift Staff Acuity Panel */}
             <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-xl">
-              <div className="flex items-center justify-between mb-3 border-b border-slate-800 pb-3">
-                <div>
-                  <h3 className="text-sm font-bold text-slate-200">
-                    Clinical Action Bundles for Bed {selectedPatient.bed} ({selectedPatient.name})
-                  </h3>
-                  <p className="text-xs text-slate-400">Selecting mitigations dynamically recalculates in-hospital risk scores.</p>
-                </div>
-                <button onClick={() => setSelectedPatient(null)} className="text-slate-400 hover:text-slate-200">
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-                {AVAILABLE_ACTIONS.map(action => {
-                  const isActive = selectedPatient.activeActions.includes(action);
-                  return (
-                    <button
-                      key={action}
-                      onClick={() => toggleAction(selectedPatient.id, action)}
-                      className={`p-2.5 rounded-lg border text-left text-xs font-medium flex items-center justify-between transition ${
-                        isActive 
-                          ? 'bg-indigo-600/20 border-indigo-500 text-indigo-200 shadow' 
-                          : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700'
-                      }`}
-                    >
-                      <span>{action}</span>
-                      {isActive && <CheckCircle2 className="w-3.5 h-3.5 text-indigo-400" />}
-                    </button>
-                  );
-                })}
+              <h3 className="text-sm font-bold text-slate-200 mb-3 flex items-center gap-2">
+                <UserCheck className="w-4 h-4 text-indigo-400" />
+                Active Shift Staffing & Skill Mix
+              </h3>
+              <div className="space-y-2.5">
+                {[
+                  { name: 'Sarah Jenkins, RN', role: 'Team Leader', exp: '10 yrs', weight: 'High Skill (0.95)', status: 'Active' },
+                  { name: 'David Miller, RN', role: 'Staff Nurse', exp: '4 yrs', weight: 'Med Skill (0.75)', status: 'Active' },
+                  { name: 'Chloe Adams, EN', role: 'Enrolled Nurse', exp: '1 yr', weight: 'Graduate (0.50)', status: 'Active' }
+                ].map((staff, idx) => (
+                  <div key={idx} className="bg-slate-950 p-3 rounded-lg border border-slate-800 flex items-center justify-between text-xs">
+                    <div>
+                      <p className="font-bold text-slate-200">{staff.name}</p>
+                      <p className="text-slate-400 text-[11px]">{staff.role} • {staff.exp} experience</p>
+                    </div>
+                    <span className="bg-slate-800 text-indigo-300 px-2 py-1 rounded text-[10px] font-medium border border-slate-700">
+                      {staff.weight}
+                    </span>
+                  </div>
+                ))}
               </div>
             </div>
-          )}
-        </div>
-      </main>
+
+            {/* Bed Incompatibility & Transfer Predictor */}
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-xl">
+              <h3 className="text-sm font-bold text-slate-200 mb-3 flex items-center gap-2">
+                <ArrowRightLeft className="w-4 h-4 text-indigo-400" />
+                Transfer & Bed Incompatibility Flags
+              </h3>
+              <div className="space-y-2.5">
+                <div className="bg-slate-950 p-3 rounded-lg border border-amber-500/30 text-xs flex items-start gap-3">
+                  <AlertCircle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-bold text-slate-200">Bed 1 (Arthur Dent) — Cardiac in Gen Med</p>
+                    <p className="text-slate-400 text-[11px] mt-0.5">
+                      Recommended transfer to <strong>Cardiology 3B</strong> once Bed 8 discharges (&lt;6 hrs) to optimize telemetry surveillance.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="bg-slate-950 p-3 rounded-lg border border-slate-800 text-xs flex items-start gap-3">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-bold text-slate-200">Bed 4 (Clara Oswald) — Discharge Ready</p>
+                    <p className="text-slate-400 text-[11px] mt-0.5">
+                      Discharge pathway active. Predicted bed vacancy at 14:00 today.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </main>
+      )}
 
       {/* XAI Contributing Drivers & Clinician Override Modal */}
       {selectedPatient && activeModalRisk && (
@@ -509,13 +701,13 @@ export default function App() {
               <div className="flex justify-end gap-2 mt-4">
                 <button
                   onClick={() => setActiveModalRisk(null)}
-                  className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs rounded font-medium transition"
+                  className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs rounded font-medium transition cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleOverrideSubmit}
-                  className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs rounded font-medium transition shadow-lg shadow-indigo-600/30"
+                  className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs rounded font-medium transition shadow-lg shadow-indigo-600/30 cursor-pointer"
                 >
                   Save Override Log
                 </button>
