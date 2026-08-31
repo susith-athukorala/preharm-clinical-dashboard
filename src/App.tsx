@@ -200,12 +200,12 @@ export default function App() {
           </div>
           <div>
             <h1 className="text-lg font-bold tracking-tight text-white flex items-center gap-2">
-              PreHaRM Clinical Surveillance Platform
+              PreHaRM Clinical Surveillance Dashboard
               <span className="text-[10px] uppercase font-semibold bg-indigo-500/20 text-indigo-300 px-2 py-0.5 rounded border border-indigo-500/30">
-                v3.0 Web CDS
+                v1.0 Web CDSS
               </span>
             </h1>
-            <p className="text-xs text-slate-400">Sunrise EMR Real-Time In-Hospital Harm Analytics</p>
+            <p className="text-xs text-slate-400">Real-Time In-Hospital Harm Analytics</p>
           </div>
         </div>
 
