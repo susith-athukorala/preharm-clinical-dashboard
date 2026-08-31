@@ -201,56 +201,59 @@ export default function App() {
   };
 
   // Generate FHIR R4 RiskAssessment Resource
-  const generateFhirPayload = (p: Patient) => {
-    return {
-      resourceType: "RiskAssessment",
-      status: "final",
-      subject: {
-        reference: `Patient/${p.mrn}`,
-        display: p.name
-      },
-      occurrenceDateTime: new Date().toISOString(),
-      code: {
-        coding: [
-          {
-            system: "http://snomed.info/sct",
-            code: "129839007",
-            display: "At risk for falls"
-          }
-        ]
-      },
-      prediction: [
+const generateFhirPayload = (p: Patient) => {
+  return {
+    resourceType: "RiskAssessment",
+    status: "final",
+    subject: {
+      display: p.name,
+      identifier: {
+        system: "http://hospital.health.sa.gov.au/mrn",
+        value: p.mrn
+      }
+    },
+    occurrenceDateTime: new Date().toISOString(),
+    code: {
+      coding: [
         {
-          outcome: { text: "In-Hospital Fall" },
-          probabilityDecimal: p.risks.fall.score / 100,
-          qualitativeRisk: {
-            coding: [
-              {
-                system: "http://terminology.hl7.org/CodeSystem/risk-probability",
-                code: p.risks.fall.score >= 65 ? "high" : p.risks.fall.score >= 33 ? "moderate" : "low"
-              }
-            ]
-          },
-          rationale: p.risks.fall.drivers.join("; ")
-        },
-        {
-          outcome: { text: "Medication Administration Safety Error" },
-          probabilityDecimal: p.risks.meds.score / 100,
-          qualitativeRisk: {
-            coding: [
-              {
-                system: "http://terminology.hl7.org/CodeSystem/risk-probability",
-                code: p.risks.meds.score >= 65 ? "high" : p.risks.meds.score >= 33 ? "moderate" : "low"
-              }
-            ]
-          },
-          rationale: p.risks.meds.drivers.join("; ")
+          system: "http://snomed.info/sct",
+          code: "129839007",
+          display: "At risk for falls"
         }
-      ],
-      mitigation: p.activeActions.join(", "),
-      note: p.override ? [{ text: `Clinician Override: ${p.override.reason} (Adjusted to ${p.override.score}%)` }] : []
-    };
+      ]
+    },
+    prediction: [
+      {
+        outcome: { text: "In-Hospital Fall" },
+        probabilityDecimal: p.risks.fall.score / 100,
+        qualitativeRisk: {
+          coding: [
+            {
+              system: "http://terminology.hl7.org/CodeSystem/risk-probability",
+              code: p.risks.fall.score >= 65 ? "high" : p.risks.fall.score >= 33 ? "moderate" : "low"
+            }
+          ]
+        },
+        rationale: p.risks.fall.drivers.join("; ")
+      },
+      {
+        outcome: { text: "Medication Administration Safety Error" },
+        probabilityDecimal: p.risks.meds.score / 100,
+        qualitativeRisk: {
+          coding: [
+            {
+              system: "http://terminology.hl7.org/CodeSystem/risk-probability",
+              code: p.risks.meds.score >= 65 ? "high" : p.risks.meds.score >= 33 ? "moderate" : "low"
+            }
+          ]
+        },
+        rationale: p.risks.meds.drivers.join("; ")
+      }
+    ],
+    mitigation: p.activeActions.join(", "),
+    note: p.override ? [{ text: `Clinician Override: ${p.override.reason} (Adjusted to ${p.override.score}%)` }] : []
   };
+};
 
   // Transmit directly to Live HAPI FHIR R4 Public Server
   const transmitToHapiFhir = async (p: Patient) => {
