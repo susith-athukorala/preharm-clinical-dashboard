@@ -23,7 +23,7 @@ Plugs into the **Electronic Medical Record (EMR)** schema and standardizes data 
 
 The platform extracts structured clinical data from the Sunrise Clinical Performance Management (CPM) database tables:
 
-| Clinical Domain | Sunrise EMR Source Table | Target Fields | FHIR R4 Resource Equivalent |
+| Clinical Domain | EMR Source Table | Target Fields | FHIR R4 Resource Equivalent |
 | :--- | :--- | :--- | :--- |
 | **Demographics & Visit** | `SCAPatientDim`, `SCAVisit` | `MRN`, `BirthDtm`, `Gender`, `AdmitDtm`, `DischargeDtm` | `Patient`, `Encounter` |
 | **Physical Location & Flow** | `SCAVisitLocation`, `SCALocationDim` | `LocationDimID`, `TransferRequestDtm`, `MinutesInLocation`, `BedStatus` | `Encounter.location` |
