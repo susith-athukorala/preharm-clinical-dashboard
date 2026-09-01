@@ -9,7 +9,7 @@ Plugs into the **Electronic Medical Record (EMR)** schema and standardizes data 
 ## Key Clinical Features
 
 - **Spatial Bed & Transit Tracking:** Real-time visual floorplan monitoring physical bed occupancy and unmonitored intra-hospital transit intervals (e.g., transfers to Radiology / CT or Theatres) as dynamic risk multipliers.
-- **Explainable AI (XAI) Contributing Drivers:** Decomposes opaque risk percentiles into explicit, human-interpretable clinical drivers (e.g., *Advanced Age*, *FRID Sedative Exposure*, *Acute Delirium*, *Admission Reconciliation Window*).
+- **Explainable AI (XAI) Contributing Drivers:** Decomposes opaque risk percentiles into explicit, human-interpretable clinical drivers (e.g., *Advanced Age*, *Fall-Risk-Increasing Drugs (FRIDs) Exposure*, *Acute Delirium*, *Admission Reconciliation Window*).
 - **Closed-Loop Action Bundles:** Real-time risk recalculation as clinical mitigations (e.g., *Bed Guards*, *Assist Toilet*, *1:1 Special Observation*) are toggled by nursing staff.
 - **Clinician Override Audit Logging:** Allows clinical judgment overrides with logged rationale and immediate visual status updates.
 - **Role-Tailored Workflows:**
