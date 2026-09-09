@@ -313,10 +313,10 @@ export default function App() {
         <div className="flex items-center gap-2">
           <span className="font-bold tracking-wider uppercase text-[11px] text-blue-200">Government of South Australia</span>
           <span className="text-slate-400">|</span>
-          <span className="font-semibold text-slate-200">SA Health Clinical Performance & Safety</span>
+          <span className="font-semibold text-slate-200">SA Health Clinical Prediction & Safety</span>
         </div>
         <div className="flex items-center gap-4 text-[11px] text-slate-300">
-          <span className="hidden sm:inline">Sunrise EMR Production Feed</span>
+          <span className="hidden sm:inline">EMR Realtime Feed</span>
           <span className="inline-flex items-center gap-1.5 text-emerald-300 font-medium">
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> Systems Active
           </span>
@@ -328,13 +328,13 @@ export default function App() {
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-lg bg-[#0072CE] flex items-center justify-center font-bold text-white shadow-xs">
-              SAH
+              AU
             </div>
             <div>
               <h1 className="text-lg font-bold text-[#002B49] flex items-center gap-2">
                 PreHaRM Patient Safety & Risk Surveillance
                 <span className="text-[10px] font-semibold bg-blue-50 text-[#0072CE] border border-blue-200 px-2 py-0.5 rounded">
-                  v3.0 FHIR R4
+                  v0.1 FHIR R4
                 </span>
               </h1>
               <p className="text-xs text-slate-500">Continuous In-Hospital Risk Detection for Falls, Medication Safety & Aggression</p>
@@ -351,7 +351,7 @@ export default function App() {
                 className="bg-transparent border-none outline-none font-semibold text-slate-800 cursor-pointer"
               >
                 <option>Royal Adelaide Hospital (CALHN)</option>
-                <option>The Queen Elizabeth Hospital (CALHN)</option>
+                <option>Queen Elizabeth Hospital (CALHN)</option>
                 <option>Flinders Medical Centre (SALHN)</option>
                 <option>Lyell McEwin Hospital (NALHN)</option>
               </select>
@@ -401,7 +401,7 @@ export default function App() {
             </div>
             <div>
               <span className="text-slate-500 uppercase font-semibold text-[10px]">Occupancy Status:</span>
-              <span className="font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded ml-1.5">
+              <span className="font-bold text-red-700 bg-red-50 border border-red-200 px-2 py-0.5 rounded ml-1.5">
                 4 / 4 (100% - Fully Occupied)
               </span>
             </div>
