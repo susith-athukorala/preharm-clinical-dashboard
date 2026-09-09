@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { 
   AlertTriangle, 
   ShieldAlert, 
@@ -13,14 +13,14 @@ import {
   Info,
   Users,
   Calendar,
-  ArrowRightLeft,
   Clock,
   AlertCircle,
   Database,
   Send,
-  RefreshCw,
   ExternalLink,
-  Code
+  Code,
+  Building2,
+  ChevronDown
 } from 'lucide-react';
 
 interface Patient {
@@ -137,6 +137,7 @@ export default function App() {
   const [overrideScore, setOverrideScore] = useState<string>('');
   const [overrideReason, setOverrideReason] = useState<string>('');
   const [activeTab, setActiveTab] = useState<'ward' | 'num' | 'fhir'>('ward');
+  const [selectedHospital, setSelectedHospital] = useState('Royal Adelaide Hospital (CALHN)');
 
   // FHIR State
   const [fhirJsonModal, setFhirJsonModal] = useState<any | null>(null);
@@ -144,10 +145,30 @@ export default function App() {
   const [fhirSyncStatus, setFhirSyncStatus] = useState<string | null>(null);
   const [hapiResponse, setHapiResponse] = useState<any | null>(null);
 
-  const getTierColor = (score: number) => {
-    if (score >= 65) return { bg: 'bg-red-500/15', text: 'text-red-400', border: 'border-red-500/30', hex: '#EF4444' };
-    if (score >= 33) return { bg: 'bg-amber-500/15', text: 'text-amber-400', border: 'border-amber-500/30', hex: '#F59E0B' };
-    return { bg: 'bg-emerald-500/15', text: 'text-emerald-400', border: 'border-emerald-500/30', hex: '#10B981' };
+  // SA Health Accessible Status Tiers
+  const getBadgeStyle = (score: number) => {
+    if (score >= 65) {
+      return { 
+        bg: 'bg-red-50 text-red-700 border-red-200 hover:bg-red-100', 
+        badgeBg: 'bg-red-600', 
+        tier: 'High', 
+        hex: '#DC2626' 
+      };
+    }
+    if (score >= 33) {
+      return { 
+        bg: 'bg-amber-50 text-amber-800 border-amber-200 hover:bg-amber-100', 
+        badgeBg: 'bg-amber-500', 
+        tier: 'Medium', 
+        hex: '#D97706' 
+      };
+    }
+    return { 
+      bg: 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100', 
+      badgeBg: 'bg-emerald-600', 
+      tier: 'Low', 
+      hex: '#16A34A' 
+    };
   };
 
   const toggleAction = (patientId: number, actionName: string) => {
@@ -201,59 +222,59 @@ export default function App() {
   };
 
   // Generate FHIR R4 RiskAssessment Resource
-const generateFhirPayload = (p: Patient) => {
-  return {
-    resourceType: "RiskAssessment",
-    status: "final",
-    subject: {
-      display: p.name,
-      identifier: {
-        system: "http://hospital.health.sa.gov.au/mrn",
-        value: p.mrn
-      }
-    },
-    occurrenceDateTime: new Date().toISOString(),
-    code: {
-      coding: [
-        {
-          system: "http://snomed.info/sct",
-          code: "129839007",
-          display: "At risk for falls"
+  const generateFhirPayload = (p: Patient) => {
+    return {
+      resourceType: "RiskAssessment",
+      status: "final",
+      subject: {
+        display: p.name,
+        identifier: {
+          system: "http://hospital.health.sa.gov.au/mrn",
+          value: p.mrn
         }
-      ]
-    },
-    prediction: [
-      {
-        outcome: { text: "In-Hospital Fall" },
-        probabilityDecimal: p.risks.fall.score / 100,
-        qualitativeRisk: {
-          coding: [
-            {
-              system: "http://terminology.hl7.org/CodeSystem/risk-probability",
-              code: p.risks.fall.score >= 65 ? "high" : p.risks.fall.score >= 33 ? "moderate" : "low"
-            }
-          ]
-        },
-        rationale: p.risks.fall.drivers.join("; ")
       },
-      {
-        outcome: { text: "Medication Administration Safety Error" },
-        probabilityDecimal: p.risks.meds.score / 100,
-        qualitativeRisk: {
-          coding: [
-            {
-              system: "http://terminology.hl7.org/CodeSystem/risk-probability",
-              code: p.risks.meds.score >= 65 ? "high" : p.risks.meds.score >= 33 ? "moderate" : "low"
-            }
-          ]
+      occurrenceDateTime: new Date().toISOString(),
+      code: {
+        coding: [
+          {
+            system: "http://snomed.info/sct",
+            code: "129839007",
+            display: "At risk for falls"
+          }
+        ]
+      },
+      prediction: [
+        {
+          outcome: { text: "In-Hospital Fall" },
+          probabilityDecimal: p.risks.fall.score / 100,
+          qualitativeRisk: {
+            coding: [
+              {
+                system: "http://terminology.hl7.org/CodeSystem/risk-probability",
+                code: p.risks.fall.score >= 65 ? "high" : p.risks.fall.score >= 33 ? "moderate" : "low"
+              }
+            ]
+          },
+          rationale: p.risks.fall.drivers.join("; ")
         },
-        rationale: p.risks.meds.drivers.join("; ")
-      }
-    ],
-    mitigation: p.activeActions.join(", "),
-    note: p.override ? [{ text: `Clinician Override: ${p.override.reason} (Adjusted to ${p.override.score}%)` }] : []
+        {
+          outcome: { text: "Medication Administration Safety Error" },
+          probabilityDecimal: p.risks.meds.score / 100,
+          qualitativeRisk: {
+            coding: [
+              {
+                system: "http://terminology.hl7.org/CodeSystem/risk-probability",
+                code: p.risks.meds.score >= 65 ? "high" : p.risks.meds.score >= 33 ? "moderate" : "low"
+              }
+            ]
+          },
+          rationale: p.risks.meds.drivers.join("; ")
+        }
+      ],
+      mitigation: p.activeActions.join(", "),
+      note: p.override ? [{ text: `Clinician Override: ${p.override.reason} (Adjusted to ${p.override.score}%)` }] : []
+    };
   };
-};
 
   // Transmit directly to Live HAPI FHIR R4 Public Server
   const transmitToHapiFhir = async (p: Patient) => {
@@ -281,73 +302,137 @@ const generateFhirPayload = (p: Patient) => {
     }
   };
 
-  return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans flex flex-col">
-      {/* Top Header */}
-      <header className="border-b border-slate-800 bg-slate-900/80 backdrop-blur px-6 py-4 flex items-center justify-between sticky top-0 z-30">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-lg bg-indigo-600 flex items-center justify-center font-black text-white shadow-lg shadow-indigo-600/30">
-            AU
-          </div>
-          <div>
-            <h1 className="text-lg font-bold tracking-tight text-white flex items-center gap-2">
-              PreHaRM Clinical Surveillance Dashboard
-              <span className="text-[10px] uppercase font-semibold bg-indigo-500/20 text-indigo-300 px-2 py-0.5 rounded border border-indigo-500/30">
-                v0.1 FHIR R4
-              </span>
-            </h1>
-            <p className="text-xs text-slate-400">Real-Time In-Hospital Harm Analytics</p>
-          </div>
-        </div>
+  const fallAvg = Math.round(patients.reduce((a, b) => a + b.risks.fall.score, 0) / patients.length);
+  const medsAvg = Math.round(patients.reduce((a, b) => a + b.risks.meds.score, 0) / patients.length);
+  const violAvg = Math.round(patients.reduce((a, b) => a + b.risks.violence.score, 0) / patients.length);
 
-        {/* View Switchers */}
-        <div className="flex items-center gap-2 bg-slate-800/80 p-1 rounded-lg border border-slate-700">
-          <button 
-            onClick={() => setActiveTab('ward')}
-            className={`px-3 py-1.5 rounded-md text-xs font-medium transition cursor-pointer ${
-              activeTab === 'ward' ? 'bg-indigo-600 text-white shadow' : 'text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            Ward Display
-          </button>
-          <button 
-            onClick={() => setActiveTab('num')}
-            className={`px-3 py-1.5 rounded-md text-xs font-medium transition cursor-pointer ${
-              activeTab === 'num' ? 'bg-indigo-600 text-white shadow' : 'text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            NUM Overview
-          </button>
-          <button 
-            onClick={() => setActiveTab('fhir')}
-            className={`px-3 py-1.5 rounded-md text-xs font-medium transition flex items-center gap-1.5 cursor-pointer ${
-              activeTab === 'fhir' ? 'bg-indigo-600 text-white shadow' : 'text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            <Database className="w-3.5 h-3.5 text-emerald-400" />
-            HAPI FHIR Live API
-          </button>
+  return (
+    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans flex flex-col">
+      {/* SA Health Corporate Brand Header */}
+      <div className="bg-[#002B49] text-white px-6 py-2.5 text-xs flex justify-between items-center border-b border-[#003865]">
+        <div className="flex items-center gap-2">
+          <span className="font-bold tracking-wider uppercase text-[11px] text-blue-200">Government of South Australia</span>
+          <span className="text-slate-400">|</span>
+          <span className="font-semibold text-slate-200">SA Health Clinical Performance & Safety</span>
+        </div>
+        <div className="flex items-center gap-4 text-[11px] text-slate-300">
+          <span className="hidden sm:inline">Sunrise EMR Production Feed</span>
+          <span className="inline-flex items-center gap-1.5 text-emerald-300 font-medium">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> Systems Active
+          </span>
+        </div>
+      </div>
+
+      {/* Main Clinical Navigation Bar */}
+      <header className="bg-white border-b border-slate-200 px-6 py-4 shadow-xs sticky top-0 z-30">
+        <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-[#0072CE] flex items-center justify-center font-bold text-white shadow-xs">
+              SAH
+            </div>
+            <div>
+              <h1 className="text-lg font-bold text-[#002B49] flex items-center gap-2">
+                PreHaRM Patient Safety & Risk Surveillance
+                <span className="text-[10px] font-semibold bg-blue-50 text-[#0072CE] border border-blue-200 px-2 py-0.5 rounded">
+                  v3.0 FHIR R4
+                </span>
+              </h1>
+              <p className="text-xs text-slate-500">Continuous In-Hospital Risk Detection for Falls, Medication Safety & Aggression</p>
+            </div>
+          </div>
+
+          {/* Facility Dropdown and Navigation Switchers */}
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-300 px-3 py-1.5 rounded-lg text-xs font-medium text-slate-700">
+              <Building2 className="w-3.5 h-3.5 text-[#0072CE]" />
+              <select 
+                value={selectedHospital} 
+                onChange={(e) => setSelectedHospital(e.target.value)}
+                className="bg-transparent border-none outline-none font-semibold text-slate-800 cursor-pointer"
+              >
+                <option>Royal Adelaide Hospital (CALHN)</option>
+                <option>The Queen Elizabeth Hospital (CALHN)</option>
+                <option>Flinders Medical Centre (SALHN)</option>
+                <option>Lyell McEwin Hospital (NALHN)</option>
+              </select>
+            </div>
+
+            <div className="flex bg-slate-100 p-1 rounded-lg border border-slate-200 text-xs">
+              <button
+                onClick={() => setActiveTab('ward')}
+                className={`px-3 py-1.5 rounded-md font-semibold transition cursor-pointer ${
+                  activeTab === 'ward' ? 'bg-[#002B49] text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                Ward View
+              </button>
+              <button
+                onClick={() => setActiveTab('num')}
+                className={`px-3 py-1.5 rounded-md font-semibold transition cursor-pointer ${
+                  activeTab === 'num' ? 'bg-[#002B49] text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                NUM Overview
+              </button>
+              <button
+                onClick={() => setActiveTab('fhir')}
+                className={`px-3 py-1.5 rounded-md font-semibold transition cursor-pointer flex items-center gap-1.5 ${
+                  activeTab === 'fhir' ? 'bg-[#0072CE] text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <Database className="w-3.5 h-3.5" /> HAPI FHIR
+              </button>
+            </div>
+          </div>
         </div>
       </header>
 
-      {/* View 1: Ward Display */}
+      {/* SA Health Operational Capacity & Context Strip */}
+      <section className="bg-white border-b border-slate-200 py-3 px-6 shadow-xs">
+        <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-4 text-xs">
+          <div className="flex flex-wrap items-center gap-6">
+            <div>
+              <span className="text-slate-500 uppercase font-semibold text-[10px]">Location:</span>
+              <span className="font-bold text-slate-900 ml-1.5">Ward 4G (General Medicine / Cardiology)</span>
+            </div>
+            <div>
+              <span className="text-slate-500 uppercase font-semibold text-[10px]">Bed Capacity:</span>
+              <span className="font-bold text-slate-900 ml-1.5">4 Inpatient Beds</span>
+            </div>
+            <div>
+              <span className="text-slate-500 uppercase font-semibold text-[10px]">Occupancy Status:</span>
+              <span className="font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded ml-1.5">
+                4 / 4 (100% - Fully Occupied)
+              </span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <span className="text-slate-500 uppercase font-semibold text-[10px]">Last EMR Sync:</span>
+            <span className="font-semibold text-slate-700 bg-slate-100 px-2 py-0.5 rounded">Real-time Stream</span>
+          </div>
+        </div>
+      </section>
+
+      {/* View 1: Ward View */}
       {activeTab === 'ward' && (
-        <main className="flex-1 p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 max-w-7xl mx-auto w-full">
-          {/* Spatial Floorplan Map */}
+        <main className="flex-1 p-6 max-w-7xl mx-auto w-full grid grid-cols-1 lg:grid-cols-12 gap-6">
+          {/* Left Column: Floorplan Map and Acuity Overview */}
           <div className="lg:col-span-5 flex flex-col gap-6">
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-xl">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-sm font-bold text-slate-200 flex items-center gap-2">
-                  <Navigation className="w-4 h-4 text-indigo-400" />
-                  Ward 4G — Spatial Bed & Transit Map
+            {/* Spatial Bed Map */}
+            <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
+                <h2 className="text-sm font-bold text-[#002B49] flex items-center gap-2">
+                  <Navigation className="w-4 h-4 text-[#0072CE]" />
+                  Ward Spatial Bed Status
                 </h2>
-                <span className="text-[11px] text-slate-500">Live Spatial Status</span>
+                <span className="text-[11px] text-slate-500 font-medium">Floor Level 4</span>
               </div>
 
-              <svg viewBox="0 0 400 280" className="w-full h-auto bg-slate-950 rounded-lg p-2 border border-slate-800/80">
-                <rect x="20" y="120" width="360" height="40" fill="#1e293b" rx="4" />
-                <text x="200" y="145" textAnchor="middle" fill="#64748b" fontSize="10" fontWeight="bold" letterSpacing="1">
-                  CENTRAL NURSING CORRIDOR
+              <svg viewBox="0 0 400 280" className="w-full h-auto bg-slate-50 rounded-lg p-2 border border-slate-200">
+                <rect x="20" y="120" width="360" height="40" fill="#e2e8f0" rx="4" />
+                <text x="200" y="145" textAnchor="middle" fill="#475569" fontSize="10" fontWeight="bold" letterSpacing="1">
+                  CENTRAL WARD CORRIDOR
                 </text>
 
                 {[
@@ -357,7 +442,7 @@ const generateFhirPayload = (p: Patient) => {
                   { bed: 4, x: 230, y: 180 }
                 ].map(coord => {
                   const p = patients.find(pt => pt.bed === coord.bed);
-                  const colors = p ? getTierColor(p.risks.fall.score) : { hex: '#334155' };
+                  const isHigh = p ? p.risks.fall.score >= 65 : false;
                   return (
                     <g 
                       key={coord.bed} 
@@ -369,28 +454,28 @@ const generateFhirPayload = (p: Patient) => {
                         y={coord.y} 
                         width="140" 
                         height="80" 
-                        fill="#0f172a" 
-                        stroke={colors.hex} 
-                        strokeWidth="2" 
+                        fill="#ffffff" 
+                        stroke={isHigh ? '#dc2626' : '#cbd5e1'} 
+                        strokeWidth={isHigh ? '2.5' : '1.5'} 
                         rx="6"
                       />
-                      <text x={coord.x + 10} y={coord.y + 20} fill="#94a3b8" fontSize="11" fontWeight="bold">
+                      <text x={coord.x + 10} y={coord.y + 20} fill="#64748b" fontSize="11" fontWeight="bold">
                         Bed {coord.bed}
                       </text>
                       {p ? (
                         <>
-                          <text x={coord.x + 10} y={coord.y + 38} fill="#f8fafc" fontSize="11" fontWeight="600">
+                          <text x={coord.x + 10} y={coord.y + 38} fill="#0f172a" fontSize="11" fontWeight="bold">
                             {p.name}
                           </text>
-                          <text x={coord.x + 10} y={coord.y + 54} fill={p.status === 'In Transit' ? '#38bdf8' : '#64748b'} fontSize="9">
+                          <text x={coord.x + 10} y={coord.y + 54} fill={p.status === 'In Transit' ? '#0284c7' : '#64748b'} fontSize="9" fontWeight="600">
                             {p.status === 'In Transit' ? `Transit: ${p.transitDestination}` : 'Status: In Bed'}
                           </text>
-                          <circle cx={coord.x + 120} cy={coord.y + 68} r="5" fill={getTierColor(p.risks.fall.score).hex} />
-                          <circle cx={coord.x + 106} cy={coord.y + 68} r="5" fill={getTierColor(p.risks.meds.score).hex} />
-                          <circle cx={coord.x + 92} cy={coord.y + 68} r="5" fill={getTierColor(p.risks.violence.score).hex} />
+                          <circle cx={coord.x + 120} cy={coord.y + 68} r="5" fill={getBadgeStyle(p.risks.fall.score).hex} />
+                          <circle cx={coord.x + 106} cy={coord.y + 68} r="5" fill={getBadgeStyle(p.risks.meds.score).hex} />
+                          <circle cx={coord.x + 92} cy={coord.y + 68} r="5" fill={getBadgeStyle(p.risks.violence.score).hex} />
                         </>
                       ) : (
-                        <text x={coord.x + 70} y={coord.y + 45} textAnchor="middle" fill="#475569" fontSize="10">Vacant</text>
+                        <text x={coord.x + 70} y={coord.y + 45} textAnchor="middle" fill="#94a3b8" fontSize="10">Available</text>
                       )}
                     </g>
                   );
@@ -398,106 +483,112 @@ const generateFhirPayload = (p: Patient) => {
               </svg>
             </div>
 
-            {/* Mean Acuity Summary */}
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-xl">
-              <h3 className="text-sm font-bold text-slate-200 mb-3 flex items-center gap-2">
-                <Activity className="w-4 h-4 text-indigo-400" />
-                Ward Mean Acuity Summary
+            {/* Mean Acuity Overview */}
+            <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs">
+              <h3 className="text-sm font-bold text-[#002B49] mb-3 flex items-center gap-2">
+                <Activity className="w-4 h-4 text-[#0072CE]" />
+                Ward Average Acuity Overview
               </h3>
               <div className="grid grid-cols-3 gap-3">
-                {[
-                  { label: 'Falls Avg', val: Math.round(patients.reduce((a, b) => a + b.risks.fall.score, 0) / patients.length), color: 'text-amber-400' },
-                  { label: 'Meds Avg', val: Math.round(patients.reduce((a, b) => a + b.risks.meds.score, 0) / patients.length), color: 'text-emerald-400' },
-                  { label: 'Violence Avg', val: Math.round(patients.reduce((a, b) => a + b.risks.violence.score, 0) / patients.length), color: 'text-red-400' }
-                ].map((metric, i) => (
-                  <div key={i} className="bg-slate-950 p-3 rounded-lg border border-slate-800/80 text-center">
-                    <div className="text-[11px] text-slate-400 uppercase font-semibold">{metric.label}</div>
-                    <div className={`text-xl font-black mt-1 ${metric.color}`}>{metric.val}%</div>
-                  </div>
-                ))}
+                <div className="bg-slate-50 border border-slate-200 p-3 rounded-lg text-center">
+                  <span className="text-[11px] font-semibold text-slate-500 uppercase">Falls Risk</span>
+                  <div className="text-xl font-black text-amber-700 mt-1">{fallAvg}%</div>
+                  <span className="text-[10px] text-amber-600 font-medium">Moderate</span>
+                </div>
+                <div className="bg-slate-50 border border-slate-200 p-3 rounded-lg text-center">
+                  <span className="text-[11px] font-semibold text-slate-500 uppercase">Medication</span>
+                  <div className="text-xl font-black text-emerald-700 mt-1">{medsAvg}%</div>
+                  <span className="text-[10px] text-emerald-600 font-medium">Low Burden</span>
+                </div>
+                <div className="bg-slate-50 border border-slate-200 p-3 rounded-lg text-center">
+                  <span className="text-[11px] font-semibold text-slate-500 uppercase">Aggression</span>
+                  <div className="text-xl font-black text-red-700 mt-1">{violAvg}%</div>
+                  <span className="text-[10px] text-red-600 font-medium">Elevated</span>
+                </div>
               </div>
             </div>
           </div>
 
-          {/* Patient Interactive Grid */}
+          {/* Right Column: Patient Grid Table */}
           <div className="lg:col-span-7 flex flex-col gap-6">
-            <div className="bg-slate-900 border border-slate-800 rounded-xl shadow-xl overflow-hidden">
-              <div className="p-5 border-b border-slate-800 flex items-center justify-between">
+            <div className="bg-white border border-slate-200 rounded-xl shadow-xs overflow-hidden">
+              <div className="p-4 border-b border-slate-200 bg-slate-50/70 flex justify-between items-center">
                 <div>
-                  <h2 className="text-sm font-bold text-slate-200">Patient Risk & Surveillance Grid</h2>
-                  <p className="text-xs text-slate-400">Click badges for XAI drivers or &lt;FHIR&gt; to generate HL7 payloads.</p>
+                  <h2 className="text-sm font-bold text-[#002B49]">Current Inpatient Safety Grid</h2>
+                  <p className="text-xs text-slate-500">Real-time risk scoring. Click badges for clinical drivers or &lt;JSON&gt; for FHIR.</p>
                 </div>
               </div>
 
               <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse">
+                <table className="w-full text-left border-collapse text-xs">
                   <thead>
-                    <tr className="bg-slate-950/60 text-[11px] font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-800">
+                    <tr className="bg-slate-100/80 text-[11px] font-bold text-slate-600 uppercase border-b border-slate-200">
                       <th className="py-3 px-4">Bed & Patient</th>
                       <th className="py-3 px-3 text-center">Fall Risk</th>
-                      <th className="py-3 px-3 text-center">Med Error</th>
-                      <th className="py-3 px-3 text-center">Violence</th>
+                      <th className="py-3 px-3 text-center">Med Safety</th>
+                      <th className="py-3 px-3 text-center">Aggression</th>
                       <th className="py-3 px-4">FHIR R4</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-800/60 text-xs">
+                  <tbody className="divide-y divide-slate-200">
                     {patients.map(p => {
-                      const fallColor = getTierColor(p.risks.fall.score);
-                      const medsColor = getTierColor(p.risks.meds.score);
-                      const violColor = getTierColor(p.risks.violence.score);
+                      const fall = getBadgeStyle(p.risks.fall.score);
+                      const meds = getBadgeStyle(p.risks.meds.score);
+                      const viol = getBadgeStyle(p.risks.violence.score);
 
                       return (
-                        <tr key={p.id} className="hover:bg-slate-800/40 transition">
-                          <td className="py-3 px-4">
-                            <div className="font-bold text-slate-200 flex items-center gap-1.5">
-                              <span className="w-5 h-5 rounded bg-slate-800 flex items-center justify-center text-[10px] text-indigo-300 font-bold border border-slate-700">
+                        <tr key={p.id} className="hover:bg-slate-50/80 transition">
+                          <td className="py-3.5 px-4">
+                            <div className="font-bold text-slate-900 flex items-center gap-2">
+                              <span className="w-5 h-5 rounded bg-slate-100 border border-slate-300 flex items-center justify-center text-[10px] text-slate-700 font-bold">
                                 {p.bed}
                               </span>
                               {p.name}
                             </div>
-                            <div className="text-[11px] text-slate-400 mt-0.5">
+                            <div className="text-[11px] text-slate-500 mt-0.5">
                               {p.age}y {p.gender} • {p.diagnosis}
                             </div>
                           </td>
 
-                          <td className="py-3 px-3 text-center">
+                          <td className="py-3.5 px-3 text-center">
                             <button
                               onClick={() => { setSelectedPatient(p); setActiveModalRisk('fall'); }}
-                              className={`px-2.5 py-1 rounded font-bold border cursor-pointer ${fallColor.bg} ${fallColor.text} ${fallColor.border} transition hover:scale-105`}
+                              className={`px-2.5 py-1 rounded font-bold border transition cursor-pointer ${fall.bg}`}
                             >
                               {p.risks.fall.score}%
                             </button>
                           </td>
 
-                          <td className="py-3 px-3 text-center">
+                          <td className="py-3.5 px-3 text-center">
                             <button
                               onClick={() => { setSelectedPatient(p); setActiveModalRisk('meds'); }}
-                              className={`px-2.5 py-1 rounded font-bold border cursor-pointer ${medsColor.bg} ${medsColor.text} ${medsColor.border} transition hover:scale-105`}
+                              className={`px-2.5 py-1 rounded font-bold border transition cursor-pointer ${meds.bg}`}
                             >
                               {p.risks.meds.score}%
                             </button>
                           </td>
 
-                          <td className="py-3 px-3 text-center">
+                          <td className="py-3.5 px-3 text-center">
                             <button
                               onClick={() => { setSelectedPatient(p); setActiveModalRisk('violence'); }}
-                              className={`px-2.5 py-1 rounded font-bold border cursor-pointer ${violColor.bg} ${violColor.text} ${violColor.border} transition hover:scale-105`}
+                              className={`px-2.5 py-1 rounded font-bold border transition cursor-pointer ${viol.bg}`}
                             >
                               {p.risks.violence.score}%
                             </button>
                           </td>
 
-                          <td className="py-3 px-4">
+                          <td className="py-3.5 px-4">
                             <div className="flex items-center gap-2">
                               <button
                                 onClick={() => setFhirJsonModal(generateFhirPayload(p))}
-                                className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-indigo-300 border border-indigo-500/30 rounded text-[10px] font-mono font-bold flex items-center gap-1 transition cursor-pointer"
+                                className="px-2 py-1 bg-white border border-slate-300 hover:border-slate-400 rounded text-[10px] font-mono font-bold text-slate-700 flex items-center gap-1 cursor-pointer transition"
                               >
-                                <Code className="w-3 h-3" /> JSON
+                                <Code className="w-3 h-3 text-[#0072CE]" /> JSON
                               </button>
                               <button
+                                disabled={fhirSyncLoading}
                                 onClick={() => transmitToHapiFhir(p)}
-                                className="px-2 py-1 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 rounded text-[10px] font-medium flex items-center gap-1 transition cursor-pointer"
+                                className="px-2 py-1 bg-[#0072CE] hover:bg-blue-600 text-white rounded text-[10px] font-semibold flex items-center gap-1 cursor-pointer shadow-xs transition"
                               >
                                 <Send className="w-3 h-3" /> Sync HAPI
                               </button>
@@ -513,15 +604,15 @@ const generateFhirPayload = (p: Patient) => {
 
             {/* Action Bundles Panel */}
             {selectedPatient && !activeModalRisk && (
-              <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-xl">
-                <div className="flex items-center justify-between mb-3 border-b border-slate-800 pb-3">
+              <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs">
+                <div className="flex justify-between items-center pb-3 border-b border-slate-200 mb-3">
                   <div>
-                    <h3 className="text-sm font-bold text-slate-200">
-                      Clinical Action Bundles for Bed {selectedPatient.bed} ({selectedPatient.name})
+                    <h3 className="text-sm font-bold text-[#002B49]">
+                      Clinical Safety Actions: Bed {selectedPatient.bed} ({selectedPatient.name})
                     </h3>
-                    <p className="text-xs text-slate-400">Selecting mitigations dynamically recalculates in-hospital risk scores.</p>
+                    <p className="text-xs text-slate-500">Selecting mitigations dynamically adjusts the active fall risk probability.</p>
                   </div>
-                  <button onClick={() => setSelectedPatient(null)} className="text-slate-400 hover:text-slate-200 cursor-pointer">
+                  <button onClick={() => setSelectedPatient(null)} className="text-slate-400 hover:text-slate-600 cursor-pointer">
                     <X className="w-4 h-4" />
                   </button>
                 </div>
@@ -533,14 +624,14 @@ const generateFhirPayload = (p: Patient) => {
                       <button
                         key={action}
                         onClick={() => toggleAction(selectedPatient.id, action)}
-                        className={`p-2.5 rounded-lg border text-left text-xs font-medium flex items-center justify-between transition cursor-pointer ${
+                        className={`p-2.5 rounded-lg border text-left text-xs font-semibold flex items-center justify-between transition cursor-pointer ${
                           isActive 
-                            ? 'bg-indigo-600/20 border-indigo-500 text-indigo-200 shadow' 
-                            : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700'
+                            ? 'bg-blue-50 border-[#0072CE] text-[#0072CE] shadow-xs' 
+                            : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'
                         }`}
                       >
                         <span>{action}</span>
-                        {isActive && <CheckCircle2 className="w-3.5 h-3.5 text-indigo-400" />}
+                        {isActive && <CheckCircle2 className="w-3.5 h-3.5 text-[#0072CE]" />}
                       </button>
                     );
                   })}
@@ -555,112 +646,81 @@ const generateFhirPayload = (p: Patient) => {
       {activeTab === 'num' && (
         <main className="flex-1 p-6 max-w-7xl mx-auto w-full space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 flex items-center gap-4">
-              <div className="w-10 h-10 rounded-lg bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
-                <Bed className="w-5 h-5" />
-              </div>
-              <div>
-                <p className="text-xs text-slate-400 uppercase font-semibold">Ward Occupancy</p>
-                <p className="text-xl font-black text-white">4 / 4 (100%)</p>
-              </div>
+            <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-xs">
+              <span className="text-[11px] font-bold text-slate-500 uppercase">Current Ward Acuity</span>
+              <div className="text-2xl font-black text-[#002B49] mt-1">High (Level 3)</div>
+              <p className="text-[11px] text-amber-600 mt-1 font-medium">3 of 4 patients with high risk alerts</p>
             </div>
-
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 flex items-center gap-4">
-              <div className="w-10 h-10 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
-                <Users className="w-5 h-5" />
-              </div>
-              <div>
-                <p className="text-xs text-slate-400 uppercase font-semibold">Roster Ratio</p>
-                <p className="text-xl font-black text-white">1:2 <span className="text-xs font-normal text-emerald-400">Optimal</span></p>
-              </div>
+            <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-xs">
+              <span className="text-[11px] font-bold text-slate-500 uppercase">Roster Staffing Ratio</span>
+              <div className="text-2xl font-black text-emerald-700 mt-1">1:2</div>
+              <p className="text-[11px] text-emerald-600 mt-1 font-medium">Within SA Health clinical award benchmark</p>
             </div>
-
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 flex items-center gap-4">
-              <div className="w-10 h-10 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
-                <Clock className="w-5 h-5" />
-              </div>
-              <div>
-                <p className="text-xs text-slate-400 uppercase font-semibold">Est. Discharges &lt;24h</p>
-                <p className="text-xl font-black text-white">2 Patients</p>
-              </div>
+            <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-xs">
+              <span className="text-[11px] font-bold text-slate-500 uppercase">Discharges Planned &lt;24h</span>
+              <div className="text-2xl font-black text-[#0072CE] mt-1">2 Beds</div>
+              <p className="text-[11px] text-slate-500 mt-1 font-medium">Bed 1 (18h) & Bed 4 (8h)</p>
             </div>
-
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 flex items-center gap-4">
-              <div className="w-10 h-10 rounded-lg bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-400">
-                <ShieldAlert className="w-5 h-5" />
-              </div>
-              <div>
-                <p className="text-xs text-slate-400 uppercase font-semibold">High Acuity Beds</p>
-                <p className="text-xl font-black text-red-400">3 Beds</p>
-              </div>
+            <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-xs">
+              <span className="text-[11px] font-bold text-slate-500 uppercase">Active Transit Multipliers</span>
+              <div className="text-2xl font-black text-red-600 mt-1">1 Active</div>
+              <p className="text-[11px] text-red-600 mt-1 font-medium">Eleanor Vance (Bed 2) in CT Imaging</p>
             </div>
           </div>
 
-          {/* 7-Day Matrix */}
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-xl">
-            <div className="flex items-center justify-between mb-4 border-b border-slate-800 pb-3">
+          {/* 7-Day Forward Forecast Table */}
+          <div className="bg-white border border-slate-200 rounded-xl shadow-xs overflow-hidden">
+            <div className="p-4 border-b border-slate-200 bg-slate-50 flex justify-between items-center">
               <div>
-                <h2 className="text-sm font-bold text-slate-200 flex items-center gap-2">
-                  <Calendar className="w-4 h-4 text-indigo-400" />
-                  7-Day Forward Risk Forecast by Shift
-                </h2>
-                <p className="text-xs text-slate-400">Projected risk scores per shift based on planned admissions and staffing skill-mix.</p>
+                <h2 className="text-sm font-bold text-[#002B49]">7-Day Forward Risk Forecast by Shift (Morning, Evening, Night)</h2>
+                <p className="text-xs text-slate-500">Projected unit risk based on scheduled procedures, planned admissions, and roster mix.</p>
               </div>
-              <span className="text-[10px] bg-slate-800 text-slate-300 border border-slate-700 px-2 py-1 rounded font-medium">
-                Traffic Light Matrix
-              </span>
             </div>
 
             <div className="overflow-x-auto">
-              <table className="w-full text-center border-collapse">
+              <table className="w-full text-center border-collapse text-xs">
                 <thead>
-                  <tr className="bg-slate-950/60 text-[11px] font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-800">
-                    <th className="py-2.5 px-3 text-left">Risk Domain</th>
-                    <th className="py-2.5 px-2">Mon (AM)</th>
-                    <th className="py-2.5 px-2">Mon (PM)</th>
-                    <th className="py-2.5 px-2">Mon (Night)</th>
-                    <th className="py-2.5 px-2">Tue (AM)</th>
-                    <th className="py-2.5 px-2">Tue (PM)</th>
-                    <th className="py-2.5 px-2">Tue (Night)</th>
-                    <th className="py-2.5 px-2">Wed (AM)</th>
+                  <tr className="bg-slate-100/70 text-[11px] font-bold text-slate-600 uppercase border-b border-slate-200">
+                    <th className="py-3 px-4 text-left">Clinical Domain</th>
+                    <th className="py-3 px-2">Mon (AM)</th>
+                    <th className="py-3 px-2">Mon (PM)</th>
+                    <th className="py-3 px-2">Mon (Night)</th>
+                    <th className="py-3 px-2">Tue (AM)</th>
+                    <th className="py-3 px-2">Tue (PM)</th>
+                    <th className="py-3 px-2">Tue (Night)</th>
+                    <th className="py-3 px-2">Wed (AM)</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-800/60 text-xs">
+                <tbody className="divide-y divide-slate-200">
                   <tr>
-                    <td className="py-3 px-3 text-left font-bold text-slate-300 flex items-center gap-2">
-                      <span className="w-2 h-2 rounded-full bg-amber-400" /> Falls
-                    </td>
-                    <td className="py-2 px-2"><span className="px-2 py-1 rounded font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30">55%</span></td>
-                    <td className="py-2 px-2"><span className="px-2 py-1 rounded font-bold bg-red-500/20 text-red-400 border border-red-500/30">72%</span></td>
-                    <td className="py-2 px-2"><span className="px-2 py-1 rounded font-bold bg-red-500/20 text-red-400 border border-red-500/30">80%</span></td>
-                    <td className="py-2 px-2"><span className="px-2 py-1 rounded font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30">48%</span></td>
-                    <td className="py-2 px-2"><span className="px-2 py-1 rounded font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30">52%</span></td>
-                    <td className="py-2 px-2"><span className="px-2 py-1 rounded font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">30%</span></td>
-                    <td className="py-2 px-2"><span className="px-2 py-1 rounded font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">25%</span></td>
+                    <td className="py-3 px-4 text-left font-bold text-slate-800">In-Hospital Falls</td>
+                    <td className="py-2.5 px-2"><span className="px-2 py-0.5 rounded font-bold bg-amber-50 text-amber-800 border border-amber-200">55%</span></td>
+                    <td className="py-2.5 px-2"><span className="px-2 py-0.5 rounded font-bold bg-red-50 text-red-700 border border-red-200">72%</span></td>
+                    <td className="py-2.5 px-2"><span className="px-2 py-0.5 rounded font-bold bg-red-50 text-red-700 border border-red-200">80%</span></td>
+                    <td className="py-2.5 px-2"><span className="px-2 py-0.5 rounded font-bold bg-amber-50 text-amber-800 border border-amber-200">48%</span></td>
+                    <td className="py-2.5 px-2"><span className="px-2 py-0.5 rounded font-bold bg-amber-50 text-amber-800 border border-amber-200">52%</span></td>
+                    <td className="py-2.5 px-2"><span className="px-2 py-0.5 rounded font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">30%</span></td>
+                    <td className="py-2.5 px-2"><span className="px-2 py-0.5 rounded font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">25%</span></td>
                   </tr>
                   <tr>
-                    <td className="py-3 px-3 text-left font-bold text-slate-300 flex items-center gap-2">
-                      <span className="w-2 h-2 rounded-full bg-emerald-400" /> Medication Safety
-                    </td>
-                    <td className="py-2 px-2"><span className="px-2 py-1 rounded font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">28%</span></td>
-                    <td className="py-2 px-2"><span className="px-2 py-1 rounded font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30">42%</span></td>
-                    <td className="py-2 px-2"><span className="px-2 py-1 rounded font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30">45%</span></td>
-                    <td className="py-2 px-2"><span className="px-2 py-1 rounded font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">20%</span></td>
-                    <td className="py-2 px-2"><span className="px-2 py-1 rounded font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">24%</span></td>
-                    <td className="py-2 px-2"><span className="px-2 py-1 rounded font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">18%</span></td>
-                    <td className="py-2 px-2"><span className="px-2 py-1 rounded font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">15%</span></td>
+                    <td className="py-3 px-4 text-left font-bold text-slate-800">Medication Safety</td>
+                    <td className="py-2.5 px-2"><span className="px-2 py-0.5 rounded font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">28%</span></td>
+                    <td className="py-2.5 px-2"><span className="px-2 py-0.5 rounded font-bold bg-amber-50 text-amber-800 border border-amber-200">42%</span></td>
+                    <td className="py-2.5 px-2"><span className="px-2 py-0.5 rounded font-bold bg-amber-50 text-amber-800 border border-amber-200">45%</span></td>
+                    <td className="py-2.5 px-2"><span className="px-2 py-0.5 rounded font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">20%</span></td>
+                    <td className="py-2.5 px-2"><span className="px-2 py-0.5 rounded font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">24%</span></td>
+                    <td className="py-2.5 px-2"><span className="px-2 py-0.5 rounded font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">18%</span></td>
+                    <td className="py-2.5 px-2"><span className="px-2 py-0.5 rounded font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">15%</span></td>
                   </tr>
                   <tr>
-                    <td className="py-3 px-3 text-left font-bold text-slate-300 flex items-center gap-2">
-                      <span className="w-2 h-2 rounded-full bg-red-400" /> Violence / Code Black
-                    </td>
-                    <td className="py-2 px-2"><span className="px-2 py-1 rounded font-bold bg-red-500/20 text-red-400 border border-red-500/30">65%</span></td>
-                    <td className="py-2 px-2"><span className="px-2 py-1 rounded font-bold bg-red-500/20 text-red-400 border border-red-500/30">78%</span></td>
-                    <td className="py-2 px-2"><span className="px-2 py-1 rounded font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30">50%</span></td>
-                    <td className="py-2 px-2"><span className="px-2 py-1 rounded font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30">35%</span></td>
-                    <td className="py-2 px-2"><span className="px-2 py-1 rounded font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">20%</span></td>
-                    <td className="py-2 px-2"><span className="px-2 py-1 rounded font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">15%</span></td>
-                    <td className="py-2 px-2"><span className="px-2 py-1 rounded font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">10%</span></td>
+                    <td className="py-3 px-4 text-left font-bold text-slate-800">Code Black / Violence</td>
+                    <td className="py-2.5 px-2"><span className="px-2 py-0.5 rounded font-bold bg-red-50 text-red-700 border border-red-200">65%</span></td>
+                    <td className="py-2.5 px-2"><span className="px-2 py-0.5 rounded font-bold bg-red-50 text-red-700 border border-red-200">78%</span></td>
+                    <td className="py-2.5 px-2"><span className="px-2 py-0.5 rounded font-bold bg-amber-50 text-amber-800 border border-amber-200">50%</span></td>
+                    <td className="py-2.5 px-2"><span className="px-2 py-0.5 rounded font-bold bg-amber-50 text-amber-800 border border-amber-200">35%</span></td>
+                    <td className="py-2.5 px-2"><span className="px-2 py-0.5 rounded font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">20%</span></td>
+                    <td className="py-2.5 px-2"><span className="px-2 py-0.5 rounded font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">15%</span></td>
+                    <td className="py-2.5 px-2"><span className="px-2 py-0.5 rounded font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">10%</span></td>
                   </tr>
                 </tbody>
               </table>
@@ -672,57 +732,62 @@ const generateFhirPayload = (p: Patient) => {
       {/* View 3: Live HAPI FHIR Server Explorer */}
       {activeTab === 'fhir' && (
         <main className="flex-1 p-6 max-w-7xl mx-auto w-full space-y-6">
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-xl">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-4 mb-4">
+          <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-xs">
+            <div className="flex justify-between items-center pb-4 border-b border-slate-200 mb-4">
               <div>
-                <h2 className="text-base font-bold text-white flex items-center gap-2">
-                  <Database className="w-5 h-5 text-emerald-400" />
-                  Live HL7 FHIR R4 Public Server Integration
+                <h2 className="text-base font-bold text-[#002B49] flex items-center gap-2">
+                  <Database className="w-5 h-5 text-[#0072CE]" />
+                  HL7 FHIR R4 Interoperability Gateway
                 </h2>
-                <p className="text-xs text-slate-400">
-                  Direct RESTful transactions with public test endpoint: <code className="text-indigo-300 font-mono">https://hapi.fhir.org/baseR4/RiskAssessment</code>
-                </p>
+                <p className="text-xs text-slate-500">Live data exchange with the official HAPI FHIR R4 test sandbox.</p>
               </div>
               <a 
                 href="https://hapi.fhir.org/baseR4/RiskAssessment?_pretty=true" 
                 target="_blank" 
                 rel="noreferrer"
-                className="flex items-center gap-1.5 text-xs bg-slate-800 text-indigo-300 px-3 py-1.5 rounded-lg border border-slate-700 hover:bg-slate-700 transition"
+                className="flex items-center gap-1.5 text-xs bg-slate-100 text-[#0072CE] px-3 py-1.5 rounded-lg border border-slate-300 hover:bg-slate-200 transition font-semibold"
               >
-                Open HAPI Server <ExternalLink className="w-3.5 h-3.5" />
+                Inspect Public HAPI Server <ExternalLink className="w-3.5 h-3.5" />
               </a>
             </div>
 
             {fhirSyncStatus && (
-              <div className="mb-4 p-3 bg-slate-950 border border-emerald-500/30 text-emerald-300 rounded-lg text-xs font-mono flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+              <div className="mb-4 p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-lg text-xs font-mono flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
                 {fhirSyncStatus}
               </div>
             )}
 
             <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-6">
               {patients.map(p => (
-                <button
-                  key={p.id}
-                  disabled={fhirSyncLoading}
-                  onClick={() => transmitToHapiFhir(p)}
-                  className="p-3 bg-slate-950 border border-slate-800 hover:border-indigo-500/50 rounded-lg text-left transition cursor-pointer"
-                >
-                  <p className="font-bold text-xs text-slate-200">Bed {p.bed}: {p.name}</p>
-                  <p className="text-[10px] text-slate-400 mt-1">Falls: {p.risks.fall.score}% • Meds: {p.risks.meds.score}%</p>
-                  <div className="mt-2 text-[10px] font-mono text-indigo-400 flex items-center gap-1">
-                    <Send className="w-3 h-3" /> Transmit to HAPI
+                <div key={p.id} className="p-3 bg-slate-50 border border-slate-200 rounded-lg text-xs">
+                  <p className="font-bold text-slate-900">Bed {p.bed}: {p.name}</p>
+                  <p className="text-slate-500 text-[11px] mt-0.5">{p.mrn}</p>
+                  <div className="flex gap-2 mt-3">
+                    <button
+                      onClick={() => setFhirJsonModal(generateFhirPayload(p))}
+                      className="px-2 py-1 bg-white border border-slate-300 hover:border-slate-400 rounded text-[11px] font-semibold text-slate-700 flex items-center gap-1 cursor-pointer"
+                    >
+                      <Code className="w-3 h-3" /> JSON
+                    </button>
+                    <button
+                      disabled={fhirSyncLoading}
+                      onClick={() => transmitToHapiFhir(p)}
+                      className="px-2 py-1 bg-[#0072CE] hover:bg-blue-600 text-white rounded text-[11px] font-semibold flex items-center gap-1 cursor-pointer shadow-xs"
+                    >
+                      <Send className="w-3 h-3" /> Transmit
+                    </button>
                   </div>
-                </button>
+                </div>
               ))}
             </div>
 
             {hapiResponse && (
               <div>
-                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">
                   Server Response Payload (Received from HAPI FHIR R4):
                 </h3>
-                <pre className="text-xs font-mono text-emerald-400 bg-slate-950 p-4 rounded-lg border border-slate-800 overflow-x-auto max-h-96">
+                <pre className="text-xs font-mono text-emerald-400 bg-slate-900 p-4 rounded-lg border border-slate-800 overflow-x-auto max-h-96">
                   {JSON.stringify(hapiResponse, null, 2)}
                 </pre>
               </div>
@@ -733,29 +798,28 @@ const generateFhirPayload = (p: Patient) => {
 
       {/* Modal: View Generated FHIR JSON */}
       {fhirJsonModal && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-slate-900 border border-slate-800 rounded-xl max-w-2xl w-full p-6 shadow-2xl flex flex-col max-h-[85vh]">
-            <div className="flex justify-between items-center mb-3 border-b border-slate-800 pb-3">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+          <div className="bg-white border border-slate-200 rounded-xl max-w-2xl w-full p-6 shadow-xl flex flex-col max-h-[85vh]">
+            <div className="flex justify-between items-center mb-3 border-b border-slate-200 pb-3">
               <div>
-                <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
-                  <Code className="w-4 h-4 text-indigo-400" />
-                  HL7 FHIR R4 RiskAssessment Resource
+                <h3 className="text-sm font-bold text-[#002B49]">
+                  HL7 FHIR R4 Standard RiskAssessment Payload
                 </h3>
-                <p className="text-xs text-slate-400">Validated against SNOMED CT & HL7 Risk-Probability terminology.</p>
+                <p className="text-xs text-slate-500">Encoded with SNOMED CT and LOINC clinical coding standards.</p>
               </div>
-              <button onClick={() => setFhirJsonModal(null)} className="text-slate-400 hover:text-slate-200 cursor-pointer">
+              <button onClick={() => setFhirJsonModal(null)} className="text-slate-400 hover:text-slate-600 cursor-pointer">
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <pre className="flex-1 text-xs font-mono text-emerald-400 bg-slate-950 p-4 rounded-lg border border-slate-800 overflow-auto">
+            <pre className="flex-1 text-xs font-mono bg-slate-900 text-emerald-400 p-4 rounded-lg border border-slate-800 overflow-auto">
               {JSON.stringify(fhirJsonModal, null, 2)}
             </pre>
 
             <div className="flex justify-end mt-4">
               <button 
                 onClick={() => setFhirJsonModal(null)}
-                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium rounded-lg cursor-pointer"
+                className="px-4 py-2 bg-[#002B49] text-white text-xs font-semibold rounded-lg hover:bg-[#003865] cursor-pointer"
               >
                 Close Inspector
               </button>
@@ -766,38 +830,38 @@ const generateFhirPayload = (p: Patient) => {
 
       {/* XAI Contributing Drivers & Clinician Override Modal */}
       {selectedPatient && activeModalRisk && (
-        <div className="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-slate-900 border border-slate-800 rounded-xl max-w-lg w-full p-6 shadow-2xl">
-            <div className="flex justify-between items-center mb-4">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+          <div className="bg-white border border-slate-200 rounded-xl max-w-lg w-full p-6 shadow-xl">
+            <div className="flex justify-between items-center pb-3 border-b border-slate-200 mb-4">
               <div>
-                <h3 className="text-base font-bold text-slate-100 uppercase tracking-tight">
-                  {activeModalRisk === 'fall' ? 'In-Hospital Fall Prediction' : activeModalRisk === 'meds' ? 'Medication Error Risk' : 'Patient Aggression / Code Black'}
+                <h3 className="text-base font-bold text-[#002B49]">
+                  {activeModalRisk === 'fall' ? 'In-Hospital Fall Risk' : activeModalRisk === 'meds' ? 'Medication Safety Assessment' : 'Patient Aggression / Code Black'}
                 </h3>
-                <p className="text-xs text-slate-400">
+                <p className="text-xs text-slate-500">
                   Bed {selectedPatient.bed} • {selectedPatient.name} ({selectedPatient.mrn})
                 </p>
               </div>
-              <div className={`text-2xl font-black ${getTierColor(selectedPatient.risks[activeModalRisk].score).text}`}>
+              <div className="text-2xl font-black text-slate-900">
                 {selectedPatient.risks[activeModalRisk].score}%
               </div>
             </div>
 
-            {/* XAI Drivers */}
+            {/* Contributing Drivers */}
             <div className="mb-5">
-              <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2 flex items-center gap-1.5">
-                <Info className="w-3.5 h-3.5 text-indigo-400" />
-                Contributing Sunrise EMR Clinical Drivers
+              <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-2 flex items-center gap-1.5">
+                <Info className="w-3.5 h-3.5 text-[#0072CE]" />
+                Identified Clinical Risk Factors (Sunrise EMR)
               </h4>
               <div className="space-y-1.5">
                 {selectedPatient.risks[activeModalRisk].drivers.length > 0 ? (
                   selectedPatient.risks[activeModalRisk].drivers.map((driver, idx) => (
-                    <div key={idx} className="text-xs bg-slate-950 p-2.5 rounded border border-slate-800 text-slate-200 flex items-center gap-2">
-                      <span className="w-1.5 h-1.5 bg-amber-400 rounded-full" />
+                    <div key={idx} className="text-xs bg-slate-50 p-2.5 rounded border border-slate-200 text-slate-700 flex items-center gap-2">
+                      <span className="w-1.5 h-1.5 bg-amber-500 rounded-full" />
                       {driver}
                     </div>
                   ))
                 ) : (
-                  <div className="text-xs text-slate-500 italic bg-slate-950 p-2.5 rounded border border-slate-800">
+                  <div className="text-xs text-slate-500 italic bg-slate-50 p-2.5 rounded border border-slate-200">
                     No elevated empirical risk indicators identified.
                   </div>
                 )}
@@ -805,29 +869,29 @@ const generateFhirPayload = (p: Patient) => {
             </div>
 
             {/* Override Controls */}
-            <div className="border-t border-slate-800 pt-4">
-              <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">
+            <div className="border-t border-slate-200 pt-4">
+              <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-2">
                 Clinician Risk Override
               </h4>
               <div className="grid grid-cols-3 gap-2 mb-3">
                 <div>
-                  <label className="text-[10px] text-slate-400 block mb-1">Adjusted %</label>
+                  <label className="text-[10px] text-slate-500 font-semibold block mb-1">Adjusted Score (%)</label>
                   <input
                     type="number"
                     placeholder="0-100"
                     value={overrideScore}
                     onChange={e => setOverrideScore(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded px-2.5 py-1.5 text-xs text-slate-100 focus:outline-none focus:border-indigo-500"
+                    className="w-full bg-white border border-slate-300 rounded px-2.5 py-1.5 text-xs text-slate-900 focus:outline-none focus:border-[#0072CE]"
                   />
                 </div>
                 <div className="col-span-2">
-                  <label className="text-[10px] text-slate-400 block mb-1">Clinical Justification</label>
+                  <label className="text-[10px] text-slate-500 font-semibold block mb-1">Clinical Justification</label>
                   <input
                     type="text"
-                    placeholder="e.g. Constant visual surveillance arranged"
+                    placeholder="e.g. Constant 1:1 supervision active"
                     value={overrideReason}
                     onChange={e => setOverrideReason(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded px-2.5 py-1.5 text-xs text-slate-100 focus:outline-none focus:border-indigo-500"
+                    className="w-full bg-white border border-slate-300 rounded px-2.5 py-1.5 text-xs text-slate-900 focus:outline-none focus:border-[#0072CE]"
                   />
                 </div>
               </div>
@@ -835,13 +899,13 @@ const generateFhirPayload = (p: Patient) => {
               <div className="flex justify-end gap-2 mt-4">
                 <button
                   onClick={() => setActiveModalRisk(null)}
-                  className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs rounded font-medium transition cursor-pointer"
+                  className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs rounded font-medium transition cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleOverrideSubmit}
-                  className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs rounded font-medium transition shadow-lg shadow-indigo-600/30 cursor-pointer"
+                  className="px-3 py-1.5 bg-[#002B49] hover:bg-[#003865] text-white text-xs rounded font-medium transition cursor-pointer"
                 >
                   Save Override Log
                 </button>
