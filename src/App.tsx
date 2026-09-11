@@ -311,9 +311,9 @@ export default function App() {
       {/* SA Health Corporate Brand Header */}
       <div className="bg-[#002B49] text-white px-6 py-2.5 text-xs flex justify-between items-center border-b border-[#003865]">
         <div className="flex items-center gap-2">
-          <span className="font-bold tracking-wider uppercase text-[11px] text-blue-200">Government of South Australia</span>
+          <span className="font-bold tracking-wider uppercase text-[11px] text-blue-200">Department of Health</span>
           <span className="text-slate-400">|</span>
-          <span className="font-semibold text-slate-200">SA Health Clinical Prediction & Safety</span>
+          <span className="font-semibold text-slate-200">Clinical Prediction & Safety</span>
         </div>
         <div className="flex items-center gap-4 text-[11px] text-slate-300">
           <span className="hidden sm:inline">EMR Realtime Feed</span>
@@ -332,7 +332,7 @@ export default function App() {
             </div>
             <div>
               <h1 className="text-lg font-bold text-[#002B49] flex items-center gap-2">
-                PreHaRM Patient Safety & Risk Surveillance
+                Patient Safety & Risk Surveillance
                 <span className="text-[10px] font-semibold bg-blue-50 text-[#0072CE] border border-blue-200 px-2 py-0.5 rounded">
                   v0.1 FHIR R4
                 </span>
@@ -350,10 +350,10 @@ export default function App() {
                 onChange={(e) => setSelectedHospital(e.target.value)}
                 className="bg-transparent border-none outline-none font-semibold text-slate-800 cursor-pointer"
               >
-                <option>Royal Adelaide Hospital (CALHN)</option>
-                <option>Queen Elizabeth Hospital (CALHN)</option>
-                <option>Flinders Medical Centre (SALHN)</option>
-                <option>Lyell McEwin Hospital (NALHN)</option>
+                <option>Hospital A</option>
+                <option>Hospital B</option>
+                <option>Hospital C</option>
+                <option>Hospital D</option>
               </select>
             </div>
 
