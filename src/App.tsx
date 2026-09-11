@@ -314,6 +314,8 @@ export default function App() {
           <span className="font-bold tracking-wider uppercase text-[11px] text-blue-200">Department of Health</span>
           <span className="text-slate-400">|</span>
           <span className="font-semibold text-slate-200">Clinical Prediction & Safety</span>
+          <span className="text-slate-400">|</span>
+          <span className="font-semibold text-slate-200">⚠️ Notice: This is a preview test site using 100% fictional information</span>
         </div>
         <div className="flex items-center gap-4 text-[11px] text-slate-300">
           <span className="hidden sm:inline">EMR Realtime Feed</span>
