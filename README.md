@@ -57,3 +57,13 @@ npm install
 
 # 3. Start local development server
 npm run dev
+
+## Disclaimer
+
+This is a **testing, non-commercial demonstration project** developed for learning, experimentation, and showcasing the use of clinical decision support system.
+
+This application is provided **for testing and educational purposes only** and should not be relied upon for critical clinical decisions. The developer makes no guarantees regarding the accuracy, completeness, timeliness, or availability of the displayed data.
+
+This is **not an official healthcare application** and is **not affiliated with, endorsed by, or sponsored by SA Health or the Government of South Australia**.
+
+Users should always refer to the official SA Health website or Government of South Australia publications for the most up-to-date service information.
