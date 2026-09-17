@@ -57,6 +57,7 @@ npm install
 
 # 3. Start local development server
 npm run dev
+```
 
 ## Disclaimer
 
